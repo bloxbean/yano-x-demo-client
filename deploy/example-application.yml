@@ -1,0 +1,36 @@
+# Deployment configuration for the Yano X demo client (copy to /etc/yano-x-demo-client/application.yml).
+# The binary contains no cluster URLs: everything cluster-specific lives here.
+quarkus:
+  http:
+    host: 127.0.0.1        # behind a reverse proxy (Traefik) that terminates TLS
+    port: 8090
+    # Required behind a proxy: bound to 127.0.0.1, Quarkus rejects non-localhost Host headers (400) unless allowed.
+    host-validation:
+      allowed-hosts: ["client.example.org", "localhost", "127.0.0.1"]
+
+demo:
+  cluster-name: "Yano X preprod showcase"
+  # Member nodes. Writes are signed by the node they are sent to, so each entry is also a persona.
+  nodes:
+    - { id: node-0, label: "Member 0", url: "https://node0.example.org", is-default: true }
+    - { id: node-1, label: "Member 1", url: "https://node1.example.org" }
+    - { id: node-2, label: "Member 2", url: "https://node2.example.org" }
+    - { id: node-3, label: "Member 3", url: "https://node3.example.org" }
+    - { id: node-4, label: "Member 4", url: "https://node4.example.org" }
+  # Optional: let visitors enter their own node URL (server-side requests; private addresses are always refused).
+  custom-node:
+    enabled: false
+    host-pattern: "[a-z0-9-]+\\.example\\.org"
+  explorer-tx-url: "https://preprod.cardanoscan.io/transaction/{tx}"
+  rate-limit:
+    per-client-per-minute: 20
+    global-per-minute: 120
+  http:
+    user-agent: "yano-x-demo-client/0.1"
+    timeout: 10s
+  # Actors (named people). showcase-formula uses the public showcase demo seeds; for your own actors use
+  # seed-source: file with a 0600 seed file (64 hex characters).
+  actors:
+    - { id: issuer-a, label: "Ines Alvarez", organization: acme-manufacturing, role: issuer, key-id: issuer-a-k1 }
+    - { id: auditor-a, label: "Aiko Tanaka", organization: auditor-guild-a, role: auditor, key-id: auditor-a-k1 }
+    - { id: auditor-b, label: "Bruno Keller", organization: auditor-guild-b, role: auditor, key-id: auditor-b-k1 }

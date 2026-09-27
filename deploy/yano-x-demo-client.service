@@ -1,0 +1,36 @@
+# systemd unit for the Yano X demo client (native executable). Install as /etc/systemd/system/yano-x-demo-client.service.
+# Layout: /opt/yano-x-demo-client/current/yano-x-demo-client (symlink to a release dir),
+#         /etc/yano-x-demo-client/application.yml (0640 root:yano-demo), optional keys in /etc/yano-x-demo-client/keys/.
+[Unit]
+Description=Yano X demo client
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yano-demo
+Group=yano-demo
+ExecStart=/opt/yano-x-demo-client/current/yano-x-demo-client -Xmx256m -Dquarkus.config.locations=/etc/yano-x-demo-client/application.yml
+Restart=on-failure
+RestartSec=5
+MemoryMax=512M
+TasksMax=512
+LimitNOFILE=65536
+# Hardening: read-only system, no privilege escalation, private /tmp, no access to homes.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictNamespaces=true
+CapabilityBoundingSet=
+ReadOnlyPaths=/etc/yano-x-demo-client
+SyslogIdentifier=yano-x-demo-client
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,5 @@
 # Built-in defaults only. Cluster node URLs are NOT compiled in: provide them in config/application.yml next to the
-# binary (Quarkus reads ./config/application.yml) or via environment variables. See config/example-application.yml.
+# binary (Quarkus reads ./config/application.yml) or via environment variables. See deploy/example-application.yml.
 quarkus:
   application:
     name: yano-x-demo-client
@@ -8,11 +8,10 @@ quarkus:
     host: 0.0.0.0
     limits:
       max-body-size: 64K
-    # Traefik terminates TLS and forwards the client address.
+    # Behind Cloudflare + Traefik the app reads the visitor address from CF-Connecting-IP itself. Deployments behind a
+    # proxy must set quarkus.http.host-validation.allowed-hosts to the public host (see deploy/example-application.yml).
     proxy:
-      proxy-address-forwarding: true
-      allow-x-forwarded: true
-      enable-forwarded-host: true
+      proxy-address-forwarding: false
   quinoa:
     build-dir: dist
     enable-spa-routing: true

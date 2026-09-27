@@ -1,61 +1,67 @@
-# yano-x-demo-client
+# Yano X demo client
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+A guided, public demo client for a Yano X app-chain cluster. Visitors pick an app chain and submit realistic data
+(editable examples). They act as the member organisations that run the cluster, or as named people who sign with
+their own keys. They then follow each message: admitted, finalized by 4 of 5 members, evaluated against the chain's
+rules, proven with a finality-certified state proof, and anchored on Cardano.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+Live: **https://client-showcase.yano-x.io** (Yano X 0.1.0-pre3 preprod showcase, 5 members).
 
-## Running the application in dev mode
+Architecture and decisions: [`docs/adr/0001-demo-client-architecture.md`](docs/adr/0001-demo-client-architecture.md).
+Research notes (payload formats, identities, APIs, risks): [`docs/research/`](docs/research/).
 
-You can run your application in dev mode that enables live coding using:
+## What it covers
 
-```shell script
-./mvnw quarkus:dev
+| Chain | What visitors do | Identity |
+|---|---|---|
+| orders-chain (ordered-log) | append order events | member |
+| registry-chain (kv-registry) | publish entries; non-owner writes are refused | member |
+| balances-chain | mint and transfer; overdrafts are refused | member |
+| documents-chain (doc-trail) | record document fingerprints; the trail head is recomputed and verified | member |
+| approvals-chain | propose and vote to a quorum; duplicate and terminal votes are ignored | member |
+| workflow-chain (composite) | register → propose → approve → release, with the outbox effect confirming on chain | member |
+| document-review-chain | issuer proposes; two independent auditors approve; any member relays the release | actor (Ed25519) + member relay |
+| registry-audit-chain, approval-audit-chain | declarative binding cascades with provable receipts | member |
+
+Other chains on the cluster are listed as coming soon: roles-chain, authenticated-map (MPF/JMT), and the read-only
+payments, settlement and Cardano history views.
+
+## How it works
+
+- **Backend (Quarkus 3.39, Java 25).** It is the only client of the Yano nodes.
+  - Node URLs come from configuration; none are compiled in.
+  - It builds and validates every payload server-side, using a deterministic CBOR codec pinned by golden vectors from
+    the release tooling.
+  - It holds actor keys and signs statements with JDK Ed25519.
+  - It rate-limits writes.
+  - It judges outcomes from state (at h−1 vs h), per-message role result codes, or binding receipts, because many
+    state machines refuse silently after finalization.
+- **UI (React 19, Vite, Tailwind 4)** is served by the backend through Quinoa. It uses the Yano X brand in a light
+  theme.
+- **Native.** It ships as a GraalVM/Mandrel native executable, about 60 MB and about 50–120 MB RSS.
+
+## Develop
+
+```bash
+# loopback tunnels to a cluster on 127.0.0.1:18070..18074 (see the "%dev" profile), then:
+./mvnw quarkus:dev -Dquarkus.http.port=8095      # UI and API on http://localhost:8095 (Vite on 5188)
+./mvnw test -Dquarkus.quinoa=false               # codec, key and signature golden vectors
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+## Build and deploy
 
-## Packaging and running the application
-
-The application can be packaged using:
-
-```shell script
-./mvnw package
+```bash
+# linux-amd64 native executable, built in a container (works from arm64 macOS)
+./mvnw package -Dnative -DskipTests -Dquarkus.native.container-build=true \
+  -Dquarkus.native.container-runtime-options=--platform=linux/amd64
 ```
 
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
+The `deploy/` directory holds:
+- a hardened systemd unit;
+- an example configuration (nodes, actors, rate limits);
+- an example Traefik route.
 
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
+Behind a reverse proxy, set `quarkus.http.host-validation.allowed-hosts` to the public host name. Otherwise Quarkus,
+bound to 127.0.0.1, answers every proxied request with 400.
 
-If you want to build an _über-jar_, execute the following command:
-
-```shell script
-./mvnw package -Dquarkus.package.jar.type=uber-jar
-```
-
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
-
-## Creating a native executable
-
-You can create a native executable using:
-
-```shell script
-./mvnw package -Dnative
-```
-
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
-
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
-```
-
-You can then execute your native executable with: `./target/yano-x-demo-client-0.1.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
-
-## Related Guides
-
-- REST Jackson ([guide](https://quarkus.io/guides/rest#json-serialisation)): Jackson serialization support for Quarkus REST. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it
-- SmallRye Health ([guide](https://quarkus.io/guides/smallrye-health)): Monitor service health
-- Quinoa ([guide](https://quarkiverse.github.io/quarkiverse-docs/quarkus-quinoa/dev/index.html)): Develop, build, and serve your npm-compatible web applications such as React, Angular, Vue, Lit, Svelte, Astro, SolidJS, and others alongside Quarkus.
-- YAML Configuration ([guide](https://quarkus.io/guides/config-yaml)): Use YAML to configure your Quarkus application
+The showcase deployment is managed from the cluster ops repository (`pre3-ops/ansible/demo-client.yml`).

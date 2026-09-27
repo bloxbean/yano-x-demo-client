@@ -1,0 +1,32 @@
+# Traefik file-provider route for the demo client (e.g. /etc/traefik/dynamic/demo-client.yml).
+http:
+  routers:
+    demo-client:
+      rule: "Host(`client.example.org`)"
+      entryPoints: [websecure]
+      service: demo-client
+      middlewares: [demo-client-security, demo-client-rate-limit]
+      tls:
+        certResolver: letsencrypt
+  services:
+    demo-client:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:8090"
+  middlewares:
+    demo-client-security:
+      headers:
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: strict-origin-when-cross-origin
+        customResponseHeaders:
+          Content-Security-Policy: >-
+            default-src 'self'; script-src 'self'; connect-src 'self';
+            style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;
+            img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+    demo-client-rate-limit:
+      rateLimit:
+        average: 50
+        burst: 100
+        sourceCriterion:
+          requestHeaderName: CF-Connecting-IP   # behind Cloudflare; use ipStrategy otherwise
