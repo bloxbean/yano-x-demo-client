@@ -330,7 +330,7 @@ public class WorkflowModule implements ChainModule {
                 Fact.of("Registered by", members.name(Hex.encode((byte[]) v.get(0)))));
     }
 
-    static byte[] compositeKey(String component, byte[] local) {
+    public static byte[] compositeKey(String component, byte[] local) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.writeBytes("yano-composite-state-v1\0".getBytes(StandardCharsets.US_ASCII));
         byte[] name = component.getBytes(StandardCharsets.US_ASCII);

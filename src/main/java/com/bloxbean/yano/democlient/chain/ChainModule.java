@@ -47,8 +47,16 @@ public interface ChainModule {
     record Probe(String label, byte[] key) {
     }
 
-    /** Where the message landed: GET /messages/{id} on the submitting node. */
-    record Finalized(String messageId, long height, int index, String sender) {
+    /**
+     * Where the message landed (GET /messages/{id} on the submitting node). For binding chains, receipt is the decoded
+     * composite binding receipt and receiptKeyHex its physical state key; otherwise null.
+     */
+    record Finalized(String messageId, long height, int index, String sender, List<?> receipt, String receiptKeyHex) {
+    }
+
+    /** Declarative-binding chains: the service fetches the composite binding receipt of each message. */
+    default boolean usesBindingReceipts() {
+        return false;
     }
 
     @FunctionalInterface

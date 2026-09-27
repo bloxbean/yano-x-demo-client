@@ -10,6 +10,7 @@ import com.bloxbean.yano.democlient.service.ClusterService;
 import com.bloxbean.yano.democlient.service.SubmissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.runtime.annotations.RegisterForReflection;
+import io.smallrye.common.annotation.RunOnVirtualThread;
 import io.vertx.core.http.HttpServerRequest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.ws.rs.GET;
@@ -32,8 +33,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+/** Every endpoint does blocking node I/O, so requests run on virtual threads (no worker-pool exhaustion). */
 @Path("/api/demo")
 @Produces(MediaType.APPLICATION_JSON)
+@RunOnVirtualThread
 public class DemoResource {
     private static final String CHAIN_ID = "[a-z][a-z0-9-]{0,62}";
 

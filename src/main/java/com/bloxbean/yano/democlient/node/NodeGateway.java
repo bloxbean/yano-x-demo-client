@@ -86,6 +86,19 @@ public class NodeGateway {
         return send(HttpRequest.newBuilder(URI.create(url)).GET(), target);
     }
 
+    private static final Pattern QUERY_PATH = Pattern.compile("[a-z0-9][a-z0-9._/-]{0,127}");
+
+    /** Read-only committed query: POST /api/v1/app-chain/chains/{chain}/query/{path} {"paramsHex": ...}. */
+    public NodeResponse query(Target target, String chainId, String path, String paramsHex) {
+        if (!CHAIN_ID.matcher(chainId).matches() || !QUERY_PATH.matcher(path).matches() || path.contains("..")
+                || !paramsHex.matches("(?:[0-9a-f]{2}){0,4096}")) {
+            throw new IllegalArgumentException("query not allowed");
+        }
+        return send(HttpRequest.newBuilder(URI.create(target.url() + "/api/v1/app-chain/chains/" + chainId + "/query/" + path))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"paramsHex\":\"" + paramsHex + "\"}")), target);
+    }
+
     /** POST /api/v1/app-chain/chains/{chain}/messages with a server-built payload. */
     public NodeResponse submit(Target target, String chainId, String topic, String bodyHex) {
         if (!CHAIN_ID.matcher(chainId).matches()) {

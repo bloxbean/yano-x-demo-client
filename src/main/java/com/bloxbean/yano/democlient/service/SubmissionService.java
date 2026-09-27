@@ -3,6 +3,7 @@ package com.bloxbean.yano.democlient.service;
 import com.bloxbean.yano.democlient.chain.ChainModule;
 import com.bloxbean.yano.democlient.chain.MemberDirectory;
 import com.bloxbean.yano.democlient.chain.StateReader;
+import com.bloxbean.yano.democlient.codec.Cbor;
 import com.bloxbean.yano.democlient.codec.Hex;
 import com.bloxbean.yano.democlient.node.NodeGateway;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -61,6 +62,7 @@ public class SubmissionService {
     private static final class Submission {
         final String id = UUID.randomUUID().toString();
         final String chainId;
+        final ChainModule module;
         final String commandId;
         final ChainModule.Prepared prepared;
         final NodeGateway.Target target;
@@ -75,9 +77,10 @@ public class SubmissionService {
         volatile ChainModule.Outcome outcome;
         volatile String error;
 
-        Submission(String chainId, String commandId, ChainModule.Prepared prepared, NodeGateway.Target target,
+        Submission(ChainModule module, String commandId, ChainModule.Prepared prepared, NodeGateway.Target target,
                    String actingAs, String actor) {
-            this.chainId = chainId;
+            this.module = module;
+            this.chainId = module.chainId();
             this.commandId = commandId;
             this.prepared = prepared;
             this.target = target;
@@ -99,7 +102,7 @@ public class SubmissionService {
     public View start(ChainModule module, String commandId, ChainModule.Prepared prepared, NodeGateway.Target target,
                       String actingAs, String actor) {
         cleanup();
-        Submission submission = new Submission(module.chainId(), commandId, prepared, target, actingAs, actor);
+        Submission submission = new Submission(module, commandId, prepared, target, actingAs, actor);
         submission.event(Stage.SUBMITTING, "Submitting through " + target.label());
         submissions.put(submission.id, submission);
         if (!inFlight.tryAcquire()) {
@@ -185,7 +188,18 @@ public class SubmissionService {
             before = snapshot;
         }
         Map<String, StateReader.Entry> after = read(reader, s.prepared.probes(), s.height);
-        ChainModule.Finalized fin = new ChainModule.Finalized(s.messageId, s.height, s.index, sender);
+        List<?> receipt = null;
+        String receiptKey = null;
+        if (s.module.usesBindingReceipts()) {
+            for (int attempt = 0; attempt < 10 && receipt == null; attempt++) {
+                receipt = compositeQuery(s, "binding-receipt-v1").map(hex -> (List<?>) Cbor.decode(Hex.decode(hex))).orElse(null);
+                if (receipt == null) {
+                    sleep(1_000);
+                }
+            }
+            receiptKey = compositeQuery(s, "binding-receipt-key-v1").orElse(null);
+        }
+        ChainModule.Finalized fin = new ChainModule.Finalized(s.messageId, s.height, s.index, sender, receipt, receiptKey);
         s.outcome = s.prepared.judge().judge(before, after, fin);
         s.event(Stage.EVALUATED, s.outcome.headline());
         releaseExclusive(s);
@@ -205,6 +219,15 @@ public class SubmissionService {
     }
 
     private static final long FOLLOW_UP_MILLIS = 45_000;
+
+    private java.util.Optional<String> compositeQuery(Submission s, String name) {
+        NodeGateway.NodeResponse response = gateway.query(s.target, s.chainId, "composite/" + name + "/" + s.messageId, "");
+        if (!response.ok()) {
+            return java.util.Optional.empty();
+        }
+        String hex = parse(response.body()).path("payloadHex").asText("");
+        return hex.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(hex);
+    }
     private final Map<String, String> exclusive = new ConcurrentHashMap<>();
 
     /** Claims the exclusive slot for this submission; false when another one holds it. */
