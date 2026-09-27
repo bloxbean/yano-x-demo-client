@@ -6,7 +6,7 @@ import { useDemo } from './App'
 import { Badge, Card, LiveDot, Spinner, accent, go } from './ui'
 
 const STEPS = [
-  { icon: MousePointerClick, title: 'Pick a chain', text: 'Each app chain runs its own state machine — logs, registries, approvals, balances, documents.' },
+  { icon: MousePointerClick, title: 'Pick a ledger', text: 'Each app ledger runs its own state machine — logs, registries, approvals, balances, documents.' },
   { icon: Users, title: 'Act as a member', text: 'Five organisations run the cluster. Choose who you are; your message is signed by that member.' },
   { icon: ShieldCheck, title: 'Watch it finalize', text: '4 of 5 members sign every block. See the outcome, a state proof, and the Cardano anchor.' },
 ]
@@ -29,10 +29,10 @@ export function Catalog() {
         <div>
           <Badge tone="accent"><LiveDot /> Live on a 5-member cluster</Badge>
           <h1 className="mt-4 text-4xl font-bold leading-[1.05] sm:text-5xl">
-            Try Yano X app chains, <span className="bg-gradient-to-r from-accent to-lime bg-clip-text text-transparent">for real.</span>
+            Try Yano X app ledgers, <span className="bg-gradient-to-r from-accent to-lime bg-clip-text text-transparent">for real.</span>
           </h1>
           <p className="mt-4 max-w-xl text-base text-muted">
-            Submit to real app chains, switch between the organisations that run them, and follow each message from
+            Submit to real app ledgers, switch between the organisations that run them, and follow each message from
             submission to a finalized, provable result anchored on Cardano. No wallet, no setup.
           </p>
         </div>
