@@ -1,0 +1,275 @@
+package com.bloxbean.yano.democlient.web;
+
+import com.bloxbean.yano.democlient.chain.ChainModule;
+import com.bloxbean.yano.democlient.chain.MemberDirectory;
+import com.bloxbean.yano.democlient.chain.Specs;
+import com.bloxbean.yano.democlient.chain.StateReader;
+import com.bloxbean.yano.democlient.config.DemoConfig;
+import com.bloxbean.yano.democlient.node.NodeGateway;
+import com.bloxbean.yano.democlient.service.ClusterService;
+import com.bloxbean.yano.democlient.service.SubmissionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.runtime.annotations.RegisterForReflection;
+import io.vertx.core.http.HttpServerRequest;
+import jakarta.enterprise.inject.Instance;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
+@Path("/api/demo")
+@Produces(MediaType.APPLICATION_JSON)
+public class DemoResource {
+    private static final String CHAIN_ID = "[a-z][a-z0-9-]{0,62}";
+
+    private final DemoConfig config;
+    private final NodeGateway gateway;
+    private final MemberDirectory members;
+    private final ClusterService cluster;
+    private final SubmissionService submissions;
+    private final RateLimiter rateLimiter;
+    private final ObjectMapper json;
+    private final Map<String, ChainModule> modules = new LinkedHashMap<>();
+    private final AtomicLong sequence = new AtomicLong(System.currentTimeMillis() / 1000 % 100_000);
+
+    public DemoResource(DemoConfig config, NodeGateway gateway, MemberDirectory members, ClusterService cluster,
+                        SubmissionService submissions, RateLimiter rateLimiter, ObjectMapper json,
+                        Instance<ChainModule> all) {
+        this.config = config;
+        this.gateway = gateway;
+        this.members = members;
+        this.cluster = cluster;
+        this.submissions = submissions;
+        this.rateLimiter = rateLimiter;
+        this.json = json;
+        all.forEach(module -> modules.put(module.chainId(), module));
+    }
+
+    // ------------------------------------------------------------------ DTOs
+
+    @RegisterForReflection
+    public record NodeInfo(String id, String label, String host, boolean isDefault) {
+    }
+
+    @RegisterForReflection
+    public record ClientConfig(String clusterName, List<NodeInfo> nodes, boolean customNodeEnabled,
+                               String explorerTxUrl, int writesPerMinute) {
+    }
+
+    @RegisterForReflection
+    public record MemberInfo(String nodeId, String label, String memberKey, String shortKey) {
+    }
+
+    @RegisterForReflection
+    public record ChainCard(Specs.Chain spec, ClusterService.ChainLive live, boolean supported) {
+    }
+
+    @RegisterForReflection
+    public record SubmitRequest(String node, String actor, Map<String, String> fields) {
+    }
+
+    @RegisterForReflection
+    public record LookupRequest(Map<String, String> fields) {
+    }
+
+    @RegisterForReflection
+    public record Problem(String error) {
+    }
+
+    // ------------------------------------------------------------------ cluster
+
+    @GET
+    @Path("/config")
+    public ClientConfig clientConfig() {
+        String defaultId = gateway.defaultTarget().id();
+        List<NodeInfo> nodes = gateway.members().stream()
+                .map(t -> new NodeInfo(t.id(), t.label(), URI.create(t.url()).getHost(), t.id().equals(defaultId)))
+                .toList();
+        return new ClientConfig(config.clusterName(), nodes, config.customNode().enabled(), config.explorerTxUrl(),
+                config.rateLimit().perClientPerMinute());
+    }
+
+    @GET
+    @Path("/members")
+    public List<MemberInfo> members() {
+        return members.members().stream()
+                .map(m -> new MemberInfo(m.nodeId(), m.label(), m.memberKey(), m.memberKey() == null ? null : m.shortKey()))
+                .toList();
+    }
+
+    @GET
+    @Path("/chains")
+    public List<ChainCard> chains(@QueryParam("node") String node, @QueryParam("nodeUrl") String nodeUrl) {
+        NodeGateway.Target target = gateway.resolve(node, nodeUrl);
+        List<ChainCard> cards = new ArrayList<>();
+        List<String> hosted = cluster.chainIds(target);
+        for (ChainModule module : modules.values()) {
+            cards.add(new ChainCard(module.spec(), cluster.live(target, module.chainId()), true));
+        }
+        for (String chainId : hosted) {
+            if (!modules.containsKey(chainId)) {
+                cards.add(new ChainCard(new Specs.Chain(chainId, chainId, "Available on the cluster; interactive demo coming soon",
+                        "", "", "More chains", List.of(), true, "slate", List.of(), List.of()),
+                        cluster.live(target, chainId), false));
+            }
+        }
+        cards.sort(Comparator.comparing((ChainCard c) -> !c.supported()));
+        return cards;
+    }
+
+    @GET
+    @Path("/chains/{chainId}")
+    public ChainCard chain(@PathParam("chainId") String chainId, @QueryParam("node") String node,
+                           @QueryParam("nodeUrl") String nodeUrl) {
+        ChainModule module = module(chainId);
+        return new ChainCard(module.spec(), cluster.live(gateway.resolve(node, nodeUrl), chainId), true);
+    }
+
+    @GET
+    @Path("/chains/{chainId}/agreement")
+    public ClusterService.Agreement agreement(@PathParam("chainId") String chainId) {
+        return cluster.agreement(chainIdOrThrow(chainId));
+    }
+
+    @GET
+    @Path("/chains/{chainId}/activity")
+    public List<ClusterService.ActivityItem> activity(@PathParam("chainId") String chainId,
+                                                      @QueryParam("node") String node,
+                                                      @QueryParam("nodeUrl") String nodeUrl,
+                                                      @QueryParam("limit") Integer limit) {
+        int bounded = limit == null ? 15 : Math.max(1, Math.min(limit, 40));
+        return cluster.activity(gateway.resolve(node, nodeUrl), modules.get(chainIdOrThrow(chainId)), chainId, bounded);
+    }
+
+    @GET
+    @Path("/chains/{chainId}/proof/{keyHex}")
+    public Response proof(@PathParam("chainId") String chainId, @PathParam("keyHex") String keyHex,
+                          @QueryParam("node") String node, @QueryParam("nodeUrl") String nodeUrl) {
+        if (!keyHex.matches("(?:[0-9a-f]{2}){1,256}")) {
+            return bad("key must be lowercase hex");
+        }
+        ClusterService.Proof proof = cluster.proof(gateway.resolve(node, nodeUrl), chainIdOrThrow(chainId), keyHex);
+        return proof == null ? Response.status(502).entity(new Problem("proof unavailable")).build() : Response.ok(proof).build();
+    }
+
+    // ------------------------------------------------------------------ commands
+
+    @GET
+    @Path("/chains/{chainId}/commands/{commandId}/mock")
+    public Map<String, String> mock(@PathParam("chainId") String chainId, @PathParam("commandId") String commandId,
+                                    @QueryParam("node") String node, @HeaderParam("X-Demo-Session") String session) {
+        ChainModule module = module(chainId);
+        String actingKey = members.byNode(node == null ? gateway.defaultTarget().id() : node)
+                .map(MemberDirectory.Member::memberKey).orElse(null);
+        return module.mock(commandId, new ChainModule.MockContext(sessionTag(session), sequence.incrementAndGet(),
+                actingKey, members));
+    }
+
+    @POST
+    @Path("/chains/{chainId}/commands/{commandId}")
+    public Response submit(@PathParam("chainId") String chainId, @PathParam("commandId") String commandId,
+                           SubmitRequest request, @Context HttpServerRequest http) {
+        ChainModule module = module(chainId);
+        Specs.Command command = module.spec().commands().stream().filter(c -> c.id().equals(commandId)).findFirst()
+                .orElseThrow(() -> new NotFoundException("unknown command"));
+        if (module.spec().readOnly()) {
+            return bad("this chain is read-only in the demo");
+        }
+        if (request == null) {
+            return bad("missing request body");
+        }
+        NodeGateway.Target target = gateway.resolve(request.node(), null);
+        MemberDirectory.Member acting = members.byNode(target.id())
+                .filter(m -> m.memberKey() != null)
+                .orElse(null);
+        if (acting == null) {
+            return Response.status(503).entity(new Problem("member " + target.label() + " is not reachable right now")).build();
+        }
+        ChainModule.Prepared prepared;
+        try {
+            prepared = module.prepare(commandId, request.fields(),
+                    new ChainModule.CommandContext(acting.memberKey(), request.actor(), members));
+        } catch (ChainModule.InvalidInput invalid) {
+            return bad(invalid.getMessage());
+        }
+        long wait = rateLimiter.acquire(clientAddress(http));
+        if (wait > 0) {
+            return Response.status(429).header("Retry-After", wait)
+                    .entity(new Problem("Easy there — the public demo allows " + config.rateLimit().perClientPerMinute()
+                            + " submissions per minute. Try again in " + wait + " s.")).build();
+        }
+        String actor = command.personaKind() == Specs.PersonaKind.ACTOR ? request.actor() : null;
+        return Response.accepted(submissions.start(module, commandId, prepared, target, acting.label(), actor)).build();
+    }
+
+    @GET
+    @Path("/submissions/{id}")
+    public Response submission(@PathParam("id") String id) {
+        SubmissionService.View view = submissions.find(id);
+        return view == null ? Response.status(404).entity(new Problem("unknown submission")).build() : Response.ok(view).build();
+    }
+
+    @POST
+    @Path("/chains/{chainId}/lookups/{lookupId}")
+    public Response lookup(@PathParam("chainId") String chainId, @PathParam("lookupId") String lookupId,
+                           @QueryParam("node") String node, @QueryParam("nodeUrl") String nodeUrl,
+                           LookupRequest request) {
+        ChainModule module = module(chainId);
+        NodeGateway.Target target = gateway.resolve(node, nodeUrl);
+        try {
+            return Response.ok(module.lookup(lookupId, request == null ? Map.of() : request.fields(),
+                    new StateReader(gateway, json, target, chainId), members)).build();
+        } catch (ChainModule.InvalidInput invalid) {
+            return bad(invalid.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    private ChainModule module(String chainId) {
+        ChainModule module = modules.get(chainIdOrThrow(chainId));
+        if (module == null) {
+            throw new NotFoundException("chain not available in the demo");
+        }
+        return module;
+    }
+
+    private static String chainIdOrThrow(String chainId) {
+        if (chainId == null || !chainId.matches(CHAIN_ID)) {
+            throw new NotFoundException("invalid chain id");
+        }
+        return chainId;
+    }
+
+    private static String sessionTag(String session) {
+        return session != null && session.matches("[a-z0-9]{4,8}") ? session : "anon";
+    }
+
+    /** Cloudflare → Traefik → app: CF-Connecting-IP is the visitor; fall back to the proxied remote address. */
+    private static String clientAddress(HttpServerRequest http) {
+        String cf = http.getHeader("CF-Connecting-IP");
+        if (cf != null && !cf.isBlank()) {
+            return cf.trim();
+        }
+        return http.remoteAddress() == null ? "unknown" : http.remoteAddress().hostAddress();
+    }
+
+    private static Response bad(String message) {
+        return Response.status(400).entity(new Problem(message)).build();
+    }
+}

@@ -1,0 +1,49 @@
+# Built-in defaults only. Cluster node URLs are NOT compiled in: provide them in config/application.yml next to the
+# binary (Quarkus reads ./config/application.yml) or via environment variables. See config/example-application.yml.
+quarkus:
+  application:
+    name: yano-x-demo-client
+  http:
+    port: 8080
+    host: 0.0.0.0
+    limits:
+      max-body-size: 64K
+    # Traefik terminates TLS and forwards the client address.
+    proxy:
+      proxy-address-forwarding: true
+      allow-x-forwarded: true
+      enable-forwarded-host: true
+  quinoa:
+    build-dir: dist
+    enable-spa-routing: true
+    dev-server:
+      port: 5173
+  log:
+    level: INFO
+    console:
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] %s%e%n"
+
+demo:
+  cluster-name: Yano X demo cluster
+  rate-limit:
+    per-client-per-minute: 20
+    global-per-minute: 120
+
+# Local development: loopback tunnels to a cluster (e.g. yano-cluster/pre3-ops/scripts/tunnels.sh up api).
+"%dev":
+  demo:
+    cluster-name: Yano X preprod showcase (dev tunnels)
+    nodes:
+      - { id: node-0, label: Member 0, url: "http://127.0.0.1:18070", is-default: true }
+      - { id: node-1, label: Member 1, url: "http://127.0.0.1:18071" }
+      - { id: node-2, label: Member 2, url: "http://127.0.0.1:18072" }
+      - { id: node-3, label: Member 3, url: "http://127.0.0.1:18073" }
+      - { id: node-4, label: Member 4, url: "http://127.0.0.1:18074" }
+
+"%test":
+  quarkus:
+    quinoa:
+      enabled: false
+  demo:
+    nodes:
+      - { id: node-0, label: Member 0, url: "http://127.0.0.1:1", is-default: true }
