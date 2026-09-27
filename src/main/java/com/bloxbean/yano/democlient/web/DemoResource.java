@@ -116,20 +116,27 @@ public class DemoResource {
     @Path("/chains")
     public List<ChainCard> chains(@QueryParam("node") String node, @QueryParam("nodeUrl") String nodeUrl) {
         NodeGateway.Target target = gateway.resolve(node, nodeUrl);
-        List<ChainCard> cards = new ArrayList<>();
         List<String> hosted = cluster.chainIds(target);
-        for (ChainModule module : modules.values()) {
-            cards.add(new ChainCard(module.spec(), cluster.live(target, module.chainId()), true));
-        }
-        for (String chainId : hosted) {
-            if (!modules.containsKey(chainId)) {
-                cards.add(new ChainCard(new Specs.Chain(chainId, chainId, "Available on the cluster; interactive demo coming soon",
-                        "", "", "More chains", List.of(), true, "slate", List.of(), List.of()),
-                        cluster.live(target, chainId), false));
+        List<String> ids = new ArrayList<>(modules.keySet());
+        hosted.stream().filter(id -> !modules.containsKey(id)).forEach(ids::add);
+        // Live status per chain in parallel (one node round trip each).
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            List<java.util.concurrent.Future<ClusterService.ChainLive>> lives = ids.stream()
+                    .map(id -> executor.submit(() -> cluster.live(target, id))).toList();
+            List<ChainCard> cards = new ArrayList<>();
+            for (int i = 0; i < ids.size(); i++) {
+                String chainId = ids.get(i);
+                ChainModule module = modules.get(chainId);
+                ClusterService.ChainLive live = lives.get(i).get();
+                cards.add(module != null ? new ChainCard(module.spec(), live, true)
+                        : new ChainCard(new Specs.Chain(chainId, chainId, "Available on the cluster; interactive demo coming soon",
+                        "", "", "More chains", List.of(), true, "slate", List.of(), List.of()), live, false));
             }
+            cards.sort(Comparator.comparing((ChainCard c) -> !c.supported()).thenComparing(c -> order(c.spec().id())));
+            return cards;
+        } catch (InterruptedException | java.util.concurrent.ExecutionException failure) {
+            throw new IllegalStateException("cannot load chains", failure);
         }
-        cards.sort(Comparator.comparing((ChainCard c) -> !c.supported()));
-        return cards;
     }
 
     @GET
@@ -247,6 +254,17 @@ public class DemoResource {
             throw new NotFoundException("chain not available in the demo");
         }
         return module;
+    }
+
+    /** Catalog order: the story builds from simple to composite. */
+    private static final List<String> ORDER = List.of("orders-chain", "registry-chain", "balances-chain",
+            "documents-chain", "approvals-chain", "workflow-chain", "document-review-chain", "roles-chain",
+            "authenticated-map-chain", "authenticated-map-jmt-chain", "registry-audit-chain", "approval-audit-chain",
+            "payments-chain", "payment-chain-settlement", "cardano-history-chain");
+
+    private static int order(String chainId) {
+        int index = ORDER.indexOf(chainId);
+        return index < 0 ? ORDER.size() : index;
     }
 
     private static String chainIdOrThrow(String chainId) {

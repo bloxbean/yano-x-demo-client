@@ -1,122 +1,136 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useQuery } from '@tanstack/react-query'
+import { Globe2, Info, Server } from 'lucide-react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { api, type ClientConfig, type MemberInfo } from './api'
+import { Catalog } from './Catalog'
+import { Workspace } from './Workspace'
+import { Logo, go, useRoute } from './ui'
 
-function App() {
-  const [count, setCount] = useState(0)
+interface DemoContextValue {
+  config: ClientConfig | undefined
+  members: MemberInfo[]
+  readNode: string | undefined
+  setReadNode: (node: string) => void
+  submissions: { id: string; chainId: string }[]
+  track: (id: string, chainId: string) => void
+}
 
+const DemoContext = createContext<DemoContextValue | null>(null)
+export const useDemo = () => {
+  const value = useContext(DemoContext)
+  if (!value) throw new Error('DemoContext missing')
+  return value
+}
+
+const READ_NODE_KEY = 'yano-demo-read-node'
+const SUBMISSIONS_KEY = 'yano-demo-submissions'
+
+function load<T>(key: string, fallback: T, storage: () => Storage): T {
+  try {
+    const raw = storage().getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function DemoProvider({ children }: { children: ReactNode }) {
+  const config = useQuery({ queryKey: ['config'], queryFn: api.config, staleTime: Infinity })
+  const members = useQuery({ queryKey: ['members'], queryFn: api.members, staleTime: 60_000 })
+  const [readNode, setReadNodeState] = useState<string | undefined>(() => load(READ_NODE_KEY, undefined, () => localStorage))
+  const [submissions, setSubmissions] = useState<{ id: string; chainId: string }[]>(
+    () => load(SUBMISSIONS_KEY, [], () => sessionStorage))
+
+  useEffect(() => {
+    const nodes = config.data?.nodes ?? []
+    if (nodes.length && (!readNode || !nodes.some((n) => n.id === readNode))) {
+      setReadNodeState((nodes.find((n) => n.isDefault) ?? nodes[0]).id)
+    }
+  }, [config.data, readNode])
+
+  const setReadNode = useCallback((node: string) => {
+    setReadNodeState(node)
+    try { localStorage.setItem(READ_NODE_KEY, JSON.stringify(node)) } catch { /* private mode */ }
+  }, [])
+
+  const track = useCallback((id: string, chainId: string) => {
+    setSubmissions((previous) => {
+      const next = [{ id, chainId }, ...previous].slice(0, 40)
+      try { sessionStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
+  }, [])
+
+  const value = useMemo(() => ({
+    config: config.data, members: members.data ?? [], readNode, setReadNode, submissions, track,
+  }), [config.data, members.data, readNode, setReadNode, submissions, track])
+
+  return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>
+}
+
+function Header() {
+  const { config, readNode, setReadNode } = useDemo()
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
+    <header className="sticky top-0 z-30 border-b border-line/70 bg-surface/85 backdrop-blur-md">
+      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
+        <button onClick={() => go('/')} className="group flex items-center gap-3" aria-label="Home">
+          <span className="relative">
+            <Logo size={34} />
+          </span>
+          <span className="flex flex-col items-start leading-tight">
+            <span className="font-display text-lg font-bold tracking-tight">
+              Yano <span className="text-lime">X</span>
+              <span className="ml-2 font-sans text-sm font-medium text-muted">Demo client</span>
+            </span>
+            <span className="hidden text-[11px] text-faint sm:block">{config?.clusterName ?? 'Connecting…'}</span>
+          </span>
         </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="hidden items-center gap-1.5 rounded-full border border-amber/30 bg-amber/10 px-3 py-1 text-[11px] font-medium text-amber md:inline-flex"
+            title="Everything submitted here is written to a public test network and is permanent.">
+            <Globe2 size={12} /> Public test network · data is permanent
+          </span>
+          {config && (
+            <label className="flex items-center gap-2 rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs text-muted"
+              title="The member node used for reading state. Writes always go through the member you act as.">
+              <Server size={13} className="text-accent" />
+              <span className="hidden sm:inline">Read from</span>
+              <select value={readNode ?? ''} onChange={(e) => setReadNode(e.target.value)}
+                className="bg-transparent font-medium text-ink outline-none">
+                {config.nodes.map((node) => (
+                  <option key={node.id} value={node.id} className="bg-surface">{node.label} · {node.host}</option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </div>
+    </header>
   )
 }
 
-export default App
+function Footer() {
+  return (
+    <footer className="mx-auto mt-16 max-w-7xl border-t border-line/60 px-4 py-8 text-xs text-faint sm:px-6">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <span className="flex items-center gap-2"><Logo size={16} /> Yano X — app chains that settle on Cardano</span>
+        <a className="hover:text-accent" href="https://yano-x.io" target="_blank" rel="noreferrer">yano-x.io</a>
+        <a className="hover:text-accent" href="https://github.com/bloxbean/yano-x" target="_blank" rel="noreferrer">GitHub</a>
+        <span className="flex items-center gap-1.5"><Info size={12} /> Every write is signed by a member node, finalized by 4 of 5 signatures and periodically anchored on Cardano preprod.</span>
+      </div>
+    </footer>
+  )
+}
+
+export default function App() {
+  const route = useRoute()
+  return (
+    <DemoProvider>
+      <Header />
+      <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+        {route[0] === 'chain' && route[1] ? <Workspace chainId={route[1]} /> : <Catalog />}
+      </main>
+      <Footer />
+    </DemoProvider>
+  )
+}
