@@ -28,7 +28,7 @@ public class ApprovalsModule implements ChainModule {
     static final String TOPIC = "approvals.command.v1";
     private static final int MAX_ITEM = 200;
     private static final String ITEM_RULE = "[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}";
-    private static final String[] STATUS = {"PENDING", "APPROVED", "REJECTED", "EXPIRED"};
+    static final String[] STATUS = {"PENDING", "APPROVED", "REJECTED", "EXPIRED"};
 
     private static final Specs.Chain SPEC = new Specs.Chain(
             "approvals-chain", "Multi-party approval", "Proposals that need a quorum of member votes",
@@ -176,11 +176,11 @@ public class ApprovalsModule implements ChainModule {
         return ("i/" + item).getBytes(StandardCharsets.UTF_8);
     }
 
-    private record Item(int status, String proposer, String payloadDigest, long required, List<String> approvers,
+    record Item(int status, String proposer, String payloadDigest, long required, List<String> approvers,
                         String rejecter) {
     }
 
-    private static Item decode(StateReader.Entry entry) {
+    static Item decode(StateReader.Entry entry) {
         if (entry == null || !entry.present()) {
             return null;
         }
@@ -194,7 +194,7 @@ public class ApprovalsModule implements ChainModule {
                 (Long) v.get(3), approvers, rejecter.length == 0 ? null : Hex.encode(rejecter));
     }
 
-    private static List<Fact> facts(String item, Item found, MemberDirectory members) {
+    static List<Fact> facts(String item, Item found, MemberDirectory members) {
         if (found == null) {
             return List.of(Fact.of("Item", item), Fact.of("Status", "not found"));
         }

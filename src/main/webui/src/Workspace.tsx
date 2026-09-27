@@ -11,7 +11,7 @@ import { Badge, Button, Card, LiveDot, Mono, Spinner, accent, go } from './ui'
 type Tab = 'try' | 'lookup' | 'activity' | 'verify'
 
 /** Identifier fields carried from one command to the next within a chain (per page session). */
-const CARRIED = ['item', 'key', 'entity', 'order']
+const CARRIED = ['item', 'key', 'entity', 'order', 'proposal', 'release']
 const lastIds: Record<string, Record<string, string>> = {}
 
 export function Workspace({ chainId }: { chainId: string }) {

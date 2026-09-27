@@ -210,7 +210,8 @@ public class DemoResource {
         ChainModule.Prepared prepared;
         try {
             prepared = module.prepare(commandId, request.fields(),
-                    new ChainModule.CommandContext(acting.memberKey(), request.actor(), members));
+                    new ChainModule.CommandContext(acting.memberKey(), request.actor(), members,
+                            new StateReader(gateway, json, target, chainId)));
         } catch (ChainModule.InvalidInput invalid) {
             return bad(invalid.getMessage());
         }

@@ -107,6 +107,12 @@ public class SubmissionService {
             submission.event(Stage.FAILED, submission.error);
             return submission.view();
         }
+        if (!claimExclusive(submission)) {
+            inFlight.release();
+            submission.error = "Another visitor's release is being finalized right now; try again in a few seconds";
+            submission.event(Stage.FAILED, submission.error);
+            return submission.view();
+        }
         workers.submit(() -> {
             try {
                 run(submission);
@@ -115,6 +121,7 @@ public class SubmissionService {
                 submission.error = "Unexpected error while following the message";
                 submission.event(Stage.FAILED, submission.error);
             } finally {
+                releaseExclusive(submission);
                 inFlight.release();
             }
         });
@@ -178,9 +185,39 @@ public class SubmissionService {
             before = snapshot;
         }
         Map<String, StateReader.Entry> after = read(reader, s.prepared.probes(), s.height);
-        s.outcome = s.prepared.judge().judge(before, after,
-                new ChainModule.Finalized(s.messageId, s.height, s.index, sender));
+        ChainModule.Finalized fin = new ChainModule.Finalized(s.messageId, s.height, s.index, sender);
+        s.outcome = s.prepared.judge().judge(before, after, fin);
         s.event(Stage.EVALUATED, s.outcome.headline());
+        releaseExclusive(s);
+        if (s.prepared.followUp() != null && s.outcome.status() == ChainModule.Status.APPLIED) {
+            long until = System.currentTimeMillis() + FOLLOW_UP_MILLIS;
+            while (System.currentTimeMillis() < until) {
+                sleep(2_000);
+                ChainModule.Outcome settled = s.prepared.followUp().judge(before,
+                        read(reader, s.prepared.probes(), LATEST), fin);
+                if (settled != null) {
+                    s.outcome = settled;
+                    s.event(Stage.EVALUATED, settled.headline());
+                    break;
+                }
+            }
+        }
+    }
+
+    private static final long FOLLOW_UP_MILLIS = 45_000;
+    private final Map<String, String> exclusive = new ConcurrentHashMap<>();
+
+    /** Claims the exclusive slot for this submission; false when another one holds it. */
+    private boolean claimExclusive(Submission s) {
+        String key = s.prepared.exclusiveKey();
+        return key == null || exclusive.putIfAbsent(key, s.id) == null;
+    }
+
+    private void releaseExclusive(Submission s) {
+        String key = s.prepared.exclusiveKey();
+        if (key != null) {
+            exclusive.remove(key, s.id);
+        }
     }
 
     private static final long LATEST = -1;

@@ -39,7 +39,8 @@ public interface ChainModule {
         }
     }
 
-    record CommandContext(String actingMemberKey, String actorId, MemberDirectory members) {
+    /** reader: committed state of this chain through the acting member's node (for commands that embed state). */
+    record CommandContext(String actingMemberKey, String actorId, MemberDirectory members, StateReader reader) {
     }
 
     /** A state key read before and after the message, with a label for display. */
@@ -55,7 +56,16 @@ public interface ChainModule {
         Outcome judge(Map<String, StateReader.Entry> before, Map<String, StateReader.Entry> after, Finalized finalized);
     }
 
-    record Prepared(String topic, byte[] body, String summary, List<Probe> probes, Judge judge) {
+    /**
+     * @param followUp optional second judgement on the latest state after the first outcome (e.g. an effect that
+     *                 confirms a few blocks later); returns null while not settled
+     * @param exclusiveKey when set, only one submission with this key may be in flight in the whole app
+     */
+    record Prepared(String topic, byte[] body, String summary, List<Probe> probes, Judge judge, Judge followUp,
+                    String exclusiveKey) {
+        public Prepared(String topic, byte[] body, String summary, List<Probe> probes, Judge judge) {
+            this(topic, body, summary, probes, judge, null, null);
+        }
     }
 
     enum Status { APPLIED, NO_EFFECT, REJECTED, RECORDED }
