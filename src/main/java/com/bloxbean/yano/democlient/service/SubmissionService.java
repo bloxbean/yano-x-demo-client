@@ -158,8 +158,9 @@ public class SubmissionService {
             return;
         }
         s.messageId = body.get("messageId").asText();
-        s.event(Stage.ADMITTED, "Admitted as message " + s.messageId.substring(0, 12) + "… and signed by "
-                + s.actingAs);
+        s.event(Stage.ADMITTED, "Admitted as message " + s.messageId.substring(0, 12) + "…"
+                + (s.actor != null ? " — statement signed by " + s.actor + ", relayed and envelope-signed by " + s.actingAs
+                : " and signed by " + s.actingAs));
 
         long deadline = System.currentTimeMillis() + FINALITY_TIMEOUT_MILLIS;
         JsonNode finalized = null;
@@ -199,7 +200,8 @@ public class SubmissionService {
             }
             receiptKey = compositeQuery(s, "binding-receipt-key-v1").orElse(null);
         }
-        ChainModule.Finalized fin = new ChainModule.Finalized(s.messageId, s.height, s.index, sender, receipt, receiptKey);
+        ChainModule.Finalized fin = new ChainModule.Finalized(s.messageId, s.height, s.index, sender, receipt, receiptKey,
+                reader);
         s.outcome = s.prepared.judge().judge(before, after, fin);
         s.event(Stage.EVALUATED, s.outcome.headline());
         releaseExclusive(s);

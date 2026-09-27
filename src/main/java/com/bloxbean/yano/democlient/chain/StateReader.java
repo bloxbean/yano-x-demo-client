@@ -63,6 +63,19 @@ public final class StateReader {
         }
     }
 
+    /** Current tip height of the chain on this node, or -1. */
+    public long tipHeight() {
+        NodeGateway.NodeResponse response = gateway.get(target, "/api/v1/app-chain/chains/" + chainId + "/tip", Map.of());
+        if (!response.ok()) {
+            return -1;
+        }
+        try {
+            return json.readTree(response.body()).path("height").asLong(-1);
+        } catch (Exception malformed) {
+            return -1;
+        }
+    }
+
     public Entry latest(byte[] key) {
         return entry(key, 0);
     }

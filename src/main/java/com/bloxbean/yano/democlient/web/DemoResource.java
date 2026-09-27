@@ -1,5 +1,6 @@
 package com.bloxbean.yano.democlient.web;
 
+import com.bloxbean.yano.democlient.actor.ActorDirectory;
 import com.bloxbean.yano.democlient.chain.ChainModule;
 import com.bloxbean.yano.democlient.chain.MemberDirectory;
 import com.bloxbean.yano.democlient.chain.Specs;
@@ -46,13 +47,15 @@ public class DemoResource {
     private final ClusterService cluster;
     private final SubmissionService submissions;
     private final RateLimiter rateLimiter;
+    private final ActorDirectory actors;
     private final ObjectMapper json;
     private final Map<String, ChainModule> modules = new LinkedHashMap<>();
     private final AtomicLong sequence = new AtomicLong(System.currentTimeMillis() / 1000 % 100_000);
 
     public DemoResource(DemoConfig config, NodeGateway gateway, MemberDirectory members, ClusterService cluster,
                         SubmissionService submissions, RateLimiter rateLimiter, ObjectMapper json,
-                        Instance<ChainModule> all) {
+                        ActorDirectory actors, Instance<ChainModule> all) {
+        this.actors = actors;
         this.config = config;
         this.gateway = gateway;
         this.members = members;
@@ -113,6 +116,12 @@ public class DemoResource {
         return members.members().stream()
                 .map(m -> new MemberInfo(m.nodeId(), m.label(), m.memberKey(), m.memberKey() == null ? null : m.shortKey()))
                 .toList();
+    }
+
+    @GET
+    @Path("/actors")
+    public List<ActorDirectory.ActorInfo> actors() {
+        return actors.all();
     }
 
     @GET
@@ -210,6 +219,10 @@ public class DemoResource {
         if (acting == null) {
             return Response.status(503).entity(new Problem("member " + target.label() + " is not reachable right now")).build();
         }
+        if (command.personaKind() == Specs.PersonaKind.ACTOR
+                && (request.actor() == null || !command.actors().contains(request.actor()) || actors.find(request.actor()).isEmpty())) {
+            return bad("choose one of " + String.join(", ", command.actors()) + " to sign this command");
+        }
         ChainModule.Prepared prepared;
         try {
             prepared = module.prepare(commandId, request.fields(),
@@ -224,7 +237,9 @@ public class DemoResource {
                     .entity(new Problem("Easy there — the public demo allows " + config.rateLimit().perClientPerMinute()
                             + " submissions per minute. Try again in " + wait + " s.")).build();
         }
-        String actor = command.personaKind() == Specs.PersonaKind.ACTOR ? request.actor() : null;
+        String actor = command.personaKind() == Specs.PersonaKind.ACTOR
+                ? actors.find(request.actor()).map(a -> a.label() + " (" + a.role() + ", " + a.organization() + ")").orElse(null)
+                : null;
         return Response.accepted(submissions.start(module, commandId, prepared, target, acting.label(), actor)).build();
     }
 

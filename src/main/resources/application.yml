@@ -25,6 +25,11 @@ quarkus:
 
 demo:
   cluster-name: Yano X demo cluster
+  # Showcase demo actors registered in the document-review / authenticated-map genesis (public release seed formula).
+  actors:
+    - { id: issuer-a, label: "Ines Alvarez", organization: acme-manufacturing, role: issuer, key-id: issuer-a-k1 }
+    - { id: auditor-a, label: "Aiko Tanaka", organization: auditor-guild-a, role: auditor, key-id: auditor-a-k1 }
+    - { id: auditor-b, label: "Bruno Keller", organization: auditor-guild-b, role: auditor, key-id: auditor-b-k1 }
   rate-limit:
     per-client-per-minute: 20
     global-per-minute: 120

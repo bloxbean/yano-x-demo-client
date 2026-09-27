@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Activity, Anchor, ArrowLeft, Dices, FlaskConical, Lightbulb, Search, Send, ShieldCheck, UserRound } from 'lucide-react'
+import { Activity, Anchor, ArrowLeft, Dices, FlaskConical, KeyRound, Lightbulb, Search, Send, ShieldCheck, UserRound } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
-import { api, type ChainSpec, type Command, type Field, type LookupResult, type MemberInfo } from './api'
+import { api, type ActorInfo, type ChainSpec, type Command, type Field, type LookupResult, type MemberInfo } from './api'
 import { useDemo } from './App'
 import { SubmissionList } from './Submissions'
 import { FactsGrid, ProofButton, VerifyPanel } from './Verify'
@@ -11,7 +11,7 @@ import { Badge, Button, Card, LiveDot, Mono, Spinner, accent, go } from './ui'
 type Tab = 'try' | 'lookup' | 'activity' | 'verify'
 
 /** Identifier fields carried from one command to the next within a chain (per page session). */
-const CARRIED = ['item', 'key', 'entity', 'order', 'proposal', 'release']
+const CARRIED = ['item', 'key', 'entity', 'order', 'proposal', 'release', 'content', 'reference']
 const lastIds: Record<string, Record<string, string>> = {}
 
 export function Workspace({ chainId }: { chainId: string }) {
@@ -68,8 +68,10 @@ export function Workspace({ chainId }: { chainId: string }) {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <div className="space-y-4">
-          {spec.commands.some((c) => c.personaKind === 'MEMBER') && (
-            <PersonaSwitcher members={members} acting={actingNode} onChange={setActingNode} />
+          {spec.commands.length > 0 && (
+            <PersonaSwitcher members={members} acting={actingNode} onChange={setActingNode}
+              relayOnly={spec.commands.every((c) => c.personaKind === 'ACTOR')}
+              mixed={spec.commands.some((c) => c.personaKind === 'ACTOR')} />
           )}
           <div className="flex gap-1 rounded-2xl border border-line bg-surface p-1">
             {tabs.filter((t) => !t.hidden).map((t) => (
@@ -102,14 +104,19 @@ function Stat({ label, value, live, icon }: { label: string; value: string | num
   )
 }
 
-function PersonaSwitcher({ members, acting, onChange }: {
-  members: MemberInfo[]; acting: string | undefined; onChange: (node: string) => void
+function PersonaSwitcher({ members, acting, onChange, relayOnly, mixed }: {
+  members: MemberInfo[]; acting: string | undefined; onChange: (node: string) => void; relayOnly?: boolean; mixed?: boolean
 }) {
   return (
     <Card className="p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-semibold"><UserRound size={16} className="text-accent" /> Acting as</div>
-        <span className="text-[11px] text-faint">Messages are signed by the member you choose</span>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <UserRound size={16} className="text-accent" /> {relayOnly ? 'Relayed by' : mixed ? 'Member node' : 'Acting as'}
+        </div>
+        <span className="text-right text-[11px] text-faint">
+          {mixed ? 'People sign their own statements; the member node relays and signs the envelope'
+            : 'Messages are signed by the member you choose'}
+        </span>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
         {members.map((m, i) => (
@@ -151,6 +158,10 @@ function TryIt({ spec, actingNode }: { spec: ChainSpec; actingNode: string }) {
 
 function CommandForm({ chainId, command, actingNode }: { chainId: string; command: Command; actingNode: string }) {
   const { members, track, config } = useDemo()
+  const actorsQuery = useQuery({ queryKey: ['actors'], queryFn: api.actors, staleTime: Infinity })
+  const allowed = (actorsQuery.data ?? []).filter((a) => command.actors.includes(a.id))
+  const [actorId, setActorId] = useState<string | undefined>(command.actors[0])
+  const actor = allowed.find((a) => a.id === actorId)
   const [values, setValues] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const acting = members.find((m) => m.nodeId === actingNode)
@@ -170,7 +181,7 @@ function CommandForm({ chainId, command, actingNode }: { chainId: string; comman
   useEffect(() => { loadMock() }, [loadMock])
 
   const submit = useMutation({
-    mutationFn: () => api.submit(chainId, command.id, actingNode, values),
+    mutationFn: () => api.submit(chainId, command.id, actingNode, values, command.personaKind === 'ACTOR' ? actorId : undefined),
     onSuccess: (submission) => {
       track(submission.id, chainId)
       setError(null)
@@ -194,6 +205,9 @@ function CommandForm({ chainId, command, actingNode }: { chainId: string; comman
         <Lightbulb size={14} className="mt-0.5 shrink-0 text-lime" />
         <span><b className="text-ink">What this shows:</b> {command.demonstrates}</span>
       </div>
+      {command.personaKind === 'ACTOR' && (
+        <ActorPicker actors={allowed} selected={actorId} onChange={setActorId} />
+      )}
       <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); submit.mutate() }}>
         {command.fields.map((field) => (
           <FieldInput key={field.name} field={field} value={values[field.name] ?? ''} members={members}
@@ -202,10 +216,14 @@ function CommandForm({ chainId, command, actingNode }: { chainId: string; comman
         {error && <div className="rounded-xl border border-rose/30 bg-rose/10 px-3 py-2 text-sm text-rose">{error}</div>}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 pt-4">
           <span className="text-xs text-faint">
-            Signed by <b className="text-ink">{acting?.label ?? actingNode}</b> · limit {config?.writesPerMinute ?? 20} submissions / minute
+            {command.personaKind === 'ACTOR'
+              ? <>Signed by <b className="text-ink">{actor?.label ?? '…'}</b>, relayed by <b className="text-ink">{acting?.label ?? actingNode}</b></>
+              : <>Signed by <b className="text-ink">{acting?.label ?? actingNode}</b></>}
+            {' '}· limit {config?.writesPerMinute ?? 20} / minute
           </span>
-          <Button type="submit" disabled={submit.isPending || mock.isPending}>
-            {submit.isPending ? <Spinner /> : <Send size={15} />} Submit as {acting?.label ?? actingNode}
+          <Button type="submit" disabled={submit.isPending || mock.isPending || (command.personaKind === 'ACTOR' && !actor)}>
+            {submit.isPending ? <Spinner /> : <Send size={15} />} {command.personaKind === 'ACTOR'
+              ? `Sign as ${actor?.label.split(' ')[0] ?? '…'}` : `Submit as ${acting?.label ?? actingNode}`}
           </Button>
         </div>
       </form>
@@ -216,6 +234,35 @@ function CommandForm({ chainId, command, actingNode }: { chainId: string; comman
         </div>
       )}
     </Card>
+  )
+}
+
+function ActorPicker({ actors, selected, onChange }: {
+  actors: ActorInfo[]; selected: string | undefined; onChange: (id: string) => void
+}) {
+  return (
+    <div className="mt-4">
+      <div className="mb-2 flex items-center gap-2 text-sm font-medium"><KeyRound size={15} className="text-violet" /> Signed by</div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {actors.map((a) => (
+          <button key={a.id} type="button" onClick={() => onChange(a.id)}
+            className={clsx('rounded-xl border px-3 py-2.5 text-left transition',
+              selected === a.id ? 'border-violet/50 bg-violet/5 shadow-[0_0_0_1px_rgba(109,40,217,0.15)]' : 'border-line hover:border-violet/30')}>
+            <div className="flex items-center gap-2">
+              <span className={clsx('grid h-7 w-7 place-items-center rounded-full text-[11px] font-bold',
+                selected === a.id ? 'bg-violet text-white' : 'bg-ink/5 text-muted')}>
+                {a.label.split(' ').map((w) => w[0]).join('').slice(0, 2)}
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">{a.label}</div>
+                <div className="truncate text-[11px] text-faint">{a.role} · {a.organization}</div>
+              </div>
+            </div>
+            <Mono className="mt-1.5 block truncate text-[10px]" >key {a.keyId} · {a.publicKey.slice(0, 10)}…</Mono>
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

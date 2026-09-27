@@ -12,6 +12,7 @@ export interface ClientConfig {
   explorerTxUrl: string
   writesPerMinute: number
 }
+export interface ActorInfo { id: string; label: string; organization: string; role: string; keyId: string; publicKey: string }
 export interface MemberInfo { nodeId: string; label: string; memberKey: string | null; shortKey: string | null }
 
 export interface Option { value: string; label: string }
@@ -103,6 +104,7 @@ const nodeQuery = (node?: string) => (node ? `?node=${encodeURIComponent(node)}`
 export const api = {
   config: () => request<ClientConfig>('/config'),
   members: () => request<MemberInfo[]>('/members'),
+  actors: () => request<ActorInfo[]>('/actors'),
   chains: (node?: string) => request<ChainCard[]>(`/chains${nodeQuery(node)}`),
   chain: (id: string, node?: string) => request<ChainCard>(`/chains/${id}${nodeQuery(node)}`),
   agreement: (id: string) => request<Agreement>(`/chains/${id}/agreement`),

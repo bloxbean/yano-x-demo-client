@@ -23,6 +23,9 @@ public interface DemoConfig {
 
     CustomNode customNode();
 
+    /** Named people with Ed25519 keys (server-side only). */
+    List<Actor> actors();
+
     RateLimit rateLimit();
 
     Http http();
@@ -43,6 +46,29 @@ public interface DemoConfig {
 
         @WithDefault("false")
         boolean isDefault();
+    }
+
+    interface Actor {
+        /** Actor id as registered on chain, e.g. issuer-a. */
+        String id();
+
+        /** Display name, e.g. "Ines (issuer, Acme Manufacturing)". */
+        String label();
+
+        String organization();
+
+        String role();
+
+        String keyId();
+
+        /**
+         * showcase-formula: seed = sha256("yano-showcase-demo-actor:" + id) — the public release demo actors;
+         * file: 32-byte seed as 64 hex characters in seed-file (0600).
+         */
+        @WithDefault("showcase-formula")
+        String seedSource();
+
+        Optional<String> seedFile();
     }
 
     interface CustomNode {
