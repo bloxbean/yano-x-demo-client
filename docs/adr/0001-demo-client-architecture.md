@@ -175,15 +175,22 @@ The UI shows this as a live timeline for each submission.
 
 ### D9. Look and feel
 
-- Yano X brand:
-  - the logo (`logo.svg`, animated `logo-flying.svg` with a reduced-motion fallback, `favicon.svg` from the yano-x site);
-  - site tokens: bg `#0b1115`, surface `#111c22`, ink `#eef4f5`, muted `#a7bac3`, line `#2b3b43`, accent `#9af0d4`,
-    logo lime `#b9f57d`;
-  - Space Grotesk headings, Inter body.
-- Dark-first. A light theme follows the system setting.
-- Layout: a catalog of chain cards (story, live height, anchor status); a chain workspace with Story | Try it | State |
-  Verify tabs; a persona switcher; and a live submission timeline. Mobile-friendly.
-- It must be self-explanatory: each command has a one-line "what this demonstrates" and "try next" hints.
+- **Light theme** (owner decision, 2026-09-27), in the Yano X brand:
+  - The brand mark is the logo on its dark tile (`favicon.svg`). The plane is off-white and lime, so it needs the tile on
+    a light page. `logo.svg` and the animated `logo-flying.svg` are kept for dark surfaces.
+  - The ink `#0b1115` is the brand dark.
+  - The accent is a deeper teal (`#13866a`) from the yano-x.io light palette, with mint `#9af0d4` as a highlight tint and
+    lime from the logo.
+  - Space Grotesk headings, Inter body, JetBrains Mono for hashes.
+- Layout:
+  - a catalog of chain cards: story, live height, anchored height, connected members;
+  - a chain workspace with an **Acting as** member switcher and Try it | Look up | Activity | Verify tabs, plus a live
+    submission timeline;
+  - mobile-friendly.
+- It must be self-explanatory:
+  - each command has a "What this shows" line and "Try next" hints;
+  - identifiers carry over to follow-up commands, e.g. propose → approve with the same item;
+  - outcome cards explain silent refusals in plain words.
 
 ### D10. Hosting on node-0
 
