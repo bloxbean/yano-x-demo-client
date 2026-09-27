@@ -168,6 +168,7 @@ function CommandForm({ chainId, command, actingNode }: { chainId: string; comman
 
   const mock = useMutation({
     mutationFn: () => api.mock(chainId, command.id, actingNode),
+    retry: 2,
     onSuccess: (data) => {
       // Follow-up commands (approve, reject, delete, …) continue with the id the visitor just used.
       const carried = lastIds[chainId] ?? {}
