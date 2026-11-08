@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Activity, Anchor, ArrowLeft, Dices, FlaskConical, KeyRound, Lightbulb, Search, Send, ShieldCheck, UserRound } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
-import { api, type ActorInfo, type ChainSpec, type Command, type Field, type LookupResult, type MemberInfo } from './api'
+import { api, quorumText, type ActorInfo, type ChainSpec, type Command, type Field, type LookupResult, type MemberInfo } from './api'
 import { useDemo } from './App'
 import { SubmissionList } from './Submissions'
 import { FactsGrid, ProofButton, VerifyPanel } from './Verify'
@@ -61,7 +61,7 @@ export function Workspace({ chainId }: { chainId: string }) {
             <Stat label="Block height" value={live.tipHeight} live={live.running} />
             <Stat label="Anchored on Cardano" value={live.anchor?.anchoredHeight ?? '—'} icon={<Anchor size={13} className="text-lime" />} />
             <Stat label="Members connected" value={`${live.peersUp + 1} / ${live.peers + 1}`} />
-            <Stat label="Finality" value="4 of 5" />
+            <Stat label="Finality" value={quorumText(config)} />
           </div>
         </div>
       </section>

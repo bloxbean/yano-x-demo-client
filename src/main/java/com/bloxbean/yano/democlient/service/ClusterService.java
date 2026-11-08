@@ -2,6 +2,7 @@ package com.bloxbean.yano.democlient.service;
 
 import com.bloxbean.yano.democlient.chain.ChainModule;
 import com.bloxbean.yano.democlient.chain.MemberDirectory;
+import com.bloxbean.yano.democlient.config.DemoConfig;
 import com.bloxbean.yano.democlient.codec.Hex;
 import com.bloxbean.yano.democlient.node.NodeGateway;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -21,9 +22,11 @@ public class ClusterService {
     private final NodeGateway gateway;
     private final MemberDirectory members;
     private final ObjectMapper json;
+    private final DemoConfig.Quorum quorum;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
-    public ClusterService(NodeGateway gateway, MemberDirectory members, ObjectMapper json) {
+    public ClusterService(NodeGateway gateway, MemberDirectory members, ObjectMapper json, DemoConfig config) {
+        this.quorum = config.quorum();
         this.gateway = gateway;
         this.members = members;
         this.json = json;
@@ -199,7 +202,7 @@ public class ClusterService {
         return new Proof(keyHex, proof.path("presence").asText(), proof.path("valueHex").asText(null),
                 block.path("height").asLong(proof.path("committedHeight").asLong()),
                 block.path("stateRoot").asText(null), block.path("blockHash").asText(proof.path("blockHash").asText(null)),
-                proof.path("proofWireHex").asText(null), signers, 4, gateway.members().size());
+                proof.path("proofWireHex").asText(null), signers, quorum.threshold(), quorum.members());
     }
 
     private JsonNode read(NodeGateway.Target target, String pathAndQuery) {

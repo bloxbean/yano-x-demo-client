@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Globe2, Info, Server } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, type ClientConfig, type MemberInfo } from './api'
+import { api, quorumText, type ClientConfig, type MemberInfo } from './api'
 import { Catalog } from './Catalog'
 import { Workspace } from './Workspace'
 import { Logo, go, useRoute } from './ui'
@@ -110,13 +110,14 @@ function Header() {
 }
 
 function Footer() {
+  const { config } = useDemo()
   return (
     <footer className="mx-auto mt-16 max-w-7xl border-t border-line/60 px-4 py-8 text-xs text-faint sm:px-6">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <span className="flex items-center gap-2"><Logo size={16} /> Yano X — app ledgers that settle on Cardano</span>
         <a className="hover:text-accent" href="https://yano-x.io" target="_blank" rel="noreferrer">yano-x.io</a>
         <a className="hover:text-accent" href="https://github.com/bloxbean/yano-x" target="_blank" rel="noreferrer">GitHub</a>
-        <span className="flex items-center gap-1.5"><Info size={12} /> Every write is signed by a member node, finalized by 4 of 5 signatures and periodically anchored on Cardano preprod.</span>
+        <span className="flex items-center gap-1.5"><Info size={12} /> Every write is signed by a member node, finalized by {quorumText(config)} signatures and periodically anchored on Cardano preprod.</span>
       </div>
     </footer>
   )

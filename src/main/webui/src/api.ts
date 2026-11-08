@@ -11,6 +11,19 @@ export interface ClientConfig {
   customNodeEnabled: boolean
   explorerTxUrl: string
   writesPerMinute: number
+  /** Signatures that finalize a block, and the cluster's member count (demo.quorum.*). */
+  threshold: number
+  memberCount: number
+}
+
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+/** "3 of 5", from the deployment's quorum (falls back to the pre3 showcase's 4 of 5 until the config loads). */
+export const quorumText = (c?: ClientConfig) => `${c?.threshold ?? 4} of ${c?.memberCount ?? 5}`
+/** "Five", "Three", … for prose. */
+export const memberWord = (c?: ClientConfig) => {
+  const n = c?.memberCount ?? 5
+  const w = NUMBER_WORDS[n] ?? String(n)
+  return w.charAt(0).toUpperCase() + w.slice(1)
 }
 export interface ActorInfo { id: string; label: string; organization: string; role: string; keyId: string; publicKey: string }
 export interface MemberInfo { nodeId: string; label: string; memberKey: string | null; shortKey: string | null }

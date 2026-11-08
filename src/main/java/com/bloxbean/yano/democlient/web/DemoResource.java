@@ -74,7 +74,7 @@ public class DemoResource {
 
     @RegisterForReflection
     public record ClientConfig(String clusterName, List<NodeInfo> nodes, boolean customNodeEnabled,
-                               String explorerTxUrl, int writesPerMinute) {
+                               String explorerTxUrl, int writesPerMinute, int threshold, int memberCount) {
     }
 
     @RegisterForReflection
@@ -107,7 +107,7 @@ public class DemoResource {
                 .map(t -> new NodeInfo(t.id(), t.label(), URI.create(t.url()).getHost(), t.id().equals(defaultId)))
                 .toList();
         return new ClientConfig(config.clusterName(), nodes, config.customNode().enabled(), config.explorerTxUrl(),
-                config.rateLimit().perClientPerMinute());
+                config.rateLimit().perClientPerMinute(), config.quorum().threshold(), config.quorum().members());
     }
 
     @GET

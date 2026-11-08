@@ -22,6 +22,10 @@ demo:
     enabled: false
     host-pattern: "[a-z0-9-]+\\.example\\.org"
   explorer-tx-url: "https://preprod.cardanoscan.io/transaction/{tx}"
+  # The cluster's consensus quorum (signatures per block, members), shown in texts and proofs.
+  quorum:
+    threshold: 4
+    members: 5
   rate-limit:
     per-client-per-minute: 20
     global-per-minute: 120
