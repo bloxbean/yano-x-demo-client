@@ -79,4 +79,21 @@ public final class StateReader {
     public Entry latest(byte[] key) {
         return entry(key, 0);
     }
+
+    /**
+     * A read-only plugin domain route of this chain through the same node, e.g.
+     * {@code plugin("org.yanoproject.x.stdlib", "authenticated-map")}; null when unavailable (404, error, malformed).
+     */
+    public JsonNode plugin(String bundle, String route) {
+        NodeGateway.NodeResponse response = gateway.get(target, "/api/v1/plugins/" + bundle + "/" + route,
+                Map.of("chain", chainId));
+        if (!response.ok()) {
+            return null;
+        }
+        try {
+            return json.readTree(response.body());
+        } catch (Exception malformed) {
+            return null;
+        }
+    }
 }

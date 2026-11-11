@@ -37,13 +37,8 @@ public class DocumentReviewModule implements ChainModule {
     private static final String POLICY = "document-release";
     private static final String DOMAIN = "document.review.release.v1";
     private static final String CLAUSE = "independent-auditors";
+    private static final String COMMITMENT_HINT = "blake2b-256 of the release command (document fingerprint, id, reference)";
     private static final String ID_RULE = "[a-z][a-z0-9-]{0,62}";
-    private static final String[] PROPOSAL_STATUS = {"PENDING", "APPROVED", "REJECTED", "CANCELLED", "EXPIRED"};
-    static final String[] RESULT = {"ACCEPTED", "INVALID_PAYLOAD", "UNSUPPORTED_VERSION", "INVALID_SIGNATURE",
-            "UNAUTHORIZED_RELAY", "UNAUTHORIZED_ACTOR", "UNKNOWN_RECORD", "CONFLICT", "EXACT_REPLAY", "EXPIRED", "TERMINAL",
-            "ROLE_MISMATCH", "DISTINCTNESS_DUPLICATE", "GOVERNANCE_THRESHOLD_NOT_MET", "GOVERNANCE_PROOF_INVALID",
-            "LIMIT_EXCEEDED", "CAPACITY_EXCEEDED", "CRYPTO_WORK_EXCEEDED", "WRONG_GENESIS", "WRONG_REVISION", "NOT_READY",
-            "SUPERSEDED", "GOVERNED_ROUTE_UNSUPPORTED"};
 
     private final ActorDirectory actors;
 
@@ -109,7 +104,7 @@ public class DocumentReviewModule implements ChainModule {
         Inputs in = new Inputs(fields);
         String proposal = in.matching("proposal", "Proposal id", ID_RULE, "must start with a letter: a–z, 0–9, - (max 63)");
         MemberDirectory members = context.members();
-        byte[] proposalKey = WorkflowModule.compositeKey("role-approvals", ("q/" + proposal).getBytes(StandardCharsets.UTF_8));
+        byte[] proposalKey = RoleApprovalProposals.proposalKey(proposal);
         return switch (commandId) {
             case "propose" -> {
                 String actor = actor(context, commandId);
@@ -125,12 +120,12 @@ public class DocumentReviewModule implements ChainModule {
             }
             case "approve", "reject" -> {
                 String actor = actor(context, commandId);
-                Proposal current = decodeProposal(context.reader().latest(proposalKey));
+                RoleApprovalProposals.Proposal current = RoleApprovalProposals.decode(context.reader().latest(proposalKey));
                 if (current == null) {
                     throw new InvalidInput("Proposal " + proposal + " does not exist — propose it first");
                 }
                 var statement = new RoleStatements.Statement("approve".equals(commandId) ? RoleStatements.APPROVE
-                        : RoleStatements.REJECT, CHAIN, proposal, POLICY, 1, DOMAIN, current.payloadHash, current.deadline,
+                        : RoleStatements.REJECT, CHAIN, proposal, POLICY, 1, DOMAIN, current.payloadHash(), current.deadline(),
                         actor, 1, key(actor), CLAUSE);
                 yield new Prepared(ROLE_TOPIC, actors.signedStatement(actor, statement), commandId + " " + proposal + " as " + actor,
                         List.of(new Probe("proposal", proposalKey)), actorJudge(proposal, proposalKey, members, commandId));
@@ -144,8 +139,8 @@ public class DocumentReviewModule implements ChainModule {
                 yield new Prepared(RELEASE_TOPIC, command, "release " + entity + " under " + proposal,
                         List.of(new Probe("receipt", receiptKey), new Probe("trail", trailKey), new Probe("proposal", proposalKey)),
                         (before, after, fin) -> {
-                            Proposal p = decodeProposal(after.get("proposal"));
-                            List<Fact> facts = new ArrayList<>(proposalFacts(proposal, p));
+                            RoleApprovalProposals.Proposal p = RoleApprovalProposals.decode(after.get("proposal"));
+                            List<Fact> facts = new ArrayList<>(RoleApprovalProposals.facts(proposal, p, COMMITMENT_HINT));
                             if (before.get("receipt").present()) {
                                 return new Outcome(Status.NO_EFFECT, "Already released",
                                         "The approval was consumed by an earlier release; replays change nothing.", facts,
@@ -158,8 +153,8 @@ public class DocumentReviewModule implements ChainModule {
                                                 + " document to its trail and wrote a release receipt.", facts, Hex.encode(receiptKey));
                             }
                             String why = p == null ? "the proposal does not exist"
-                                    : p.status != 1 ? "the proposal is " + PROPOSAL_STATUS[p.status] + ", not APPROVED"
-                                    : !java.util.Arrays.equals(p.payloadHash, Blake2b.digest256(command))
+                                    : p.status() != 1 ? "the proposal is " + p.statusName() + ", not APPROVED"
+                                    : !java.util.Arrays.equals(p.payloadHash(), Blake2b.digest256(command))
                                     ? "the document, id or reference differs from what was approved" : "a policy check failed";
                             return new Outcome(Status.NO_EFFECT, "Release refused", "Nothing was released because " + why + ".",
                                     facts, Hex.encode(proposalKey));
@@ -172,10 +167,10 @@ public class DocumentReviewModule implements ChainModule {
     @Override
     public LookupResult lookup(String lookupId, Map<String, String> fields, StateReader reader, MemberDirectory members) {
         String proposal = new Inputs(fields).matching("proposal", "Proposal id", ID_RULE, "is not a valid proposal id");
-        byte[] key = WorkflowModule.compositeKey("role-approvals", ("q/" + proposal).getBytes(StandardCharsets.UTF_8));
-        Proposal p = decodeProposal(reader.latest(key));
-        return new LookupResult(p == null ? "No proposal " + proposal : proposal + " · " + PROPOSAL_STATUS[p.status],
-                proposalFacts(proposal, p), Hex.encode(key));
+        byte[] key = RoleApprovalProposals.proposalKey(proposal);
+        RoleApprovalProposals.Proposal p = RoleApprovalProposals.decode(reader.latest(key));
+        return new LookupResult(p == null ? "No proposal " + proposal : proposal + " · " + p.statusName(),
+                RoleApprovalProposals.facts(proposal, p, COMMITMENT_HINT), Hex.encode(key));
     }
 
     @Override
@@ -202,50 +197,27 @@ public class DocumentReviewModule implements ChainModule {
 
     private Judge actorJudge(String proposal, byte[] proposalKey, MemberDirectory members, String action) {
         return (before, after, fin) -> {
-            Proposal p = decodeProposal(after.get("proposal"));
-            List<Fact> facts = new ArrayList<>(proposalFacts(proposal, p));
-            String code = resultCode(fin);
+            RoleApprovalProposals.Proposal p = RoleApprovalProposals.decode(after.get("proposal"));
+            List<Fact> facts = new ArrayList<>(RoleApprovalProposals.facts(proposal, p, COMMITMENT_HINT));
+            String code = RoleApprovalProposals.resultCode(fin);
             facts.add(0, new Fact("Result code", code, "Recorded on chain for this message (role-approvals r/c/<message>)"));
             if (!"ACCEPTED".equals(code)) {
-                return new Outcome(Status.NO_EFFECT, "Refused by the policy: " + code, explain(code), facts, Hex.encode(proposalKey));
+                return new Outcome(Status.NO_EFFECT, "Refused by the policy: " + code, RoleApprovalProposals.explain(code), facts, Hex.encode(proposalKey));
             }
             String headline = switch (action) {
                 case "propose" -> "Proposal open — needs 2 independent auditors";
                 case "reject" -> "Proposal REJECTED";
-                default -> p != null && p.status == 1 ? "Policy satisfied — proposal APPROVED"
+                default -> p != null && p.status() == 1 ? "Policy satisfied — proposal APPROVED"
                         : "Approval accepted (" + (p == null ? 0 : p.approvals()) + " of 2)";
             };
             String detail = switch (action) {
                 case "propose" -> "Switch to Aiko or Bruno (auditors from different organisations) and approve.";
                 case "reject" -> "A release is no longer possible for this proposal.";
-                default -> p != null && p.status == 1 ? "Next: relay the release from any member node (step 3)."
+                default -> p != null && p.status() == 1 ? "Next: relay the release from any member node (step 3)."
                         : "One more approval from an auditor of a different organisation is needed.";
             };
             return new Outcome(Status.APPLIED, headline, detail, facts, Hex.encode(proposalKey));
         };
-    }
-
-    private static String explain(String code) {
-        return switch (code) {
-            case "ROLE_MISMATCH" -> "This person does not hold the role the policy requires for this action.";
-            case "DISTINCTNESS_DUPLICATE" -> "The policy needs approvals from different organisations — this one is already counted.";
-            case "EXACT_REPLAY" -> "The same signed statement was already applied.";
-            case "TERMINAL" -> "The proposal is already finished.";
-            case "EXPIRED" -> "The proposal's deadline has passed.";
-            case "UNKNOWN_RECORD" -> "The proposal (or actor) does not exist.";
-            case "CONFLICT" -> "A proposal with this id already exists with different content.";
-            default -> "The message was finalized, but the role-approval policy refused it.";
-        };
-    }
-
-    private static String resultCode(Finalized fin) {
-        byte[] key = WorkflowModule.compositeKey("role-approvals", ("r/c/" + fin.messageId()).getBytes(StandardCharsets.US_ASCII));
-        StateReader.Entry entry = fin.reader().entry(key, fin.height());
-        if (!entry.present()) {
-            return "NO_RESULT";
-        }
-        int code = ((Long) ((List<?>) Cbor.decode(entry.value())).get(3)).intValue();
-        return code >= 0 && code < RESULT.length ? RESULT[code] : "CODE_" + code;
     }
 
     private String actor(CommandContext context, String commandId) {
@@ -271,45 +243,6 @@ public class DocumentReviewModule implements ChainModule {
         } catch (java.security.NoSuchAlgorithmException impossible) {
             throw new IllegalStateException(impossible);
         }
-    }
-
-    private record Decision(int action, String actor, String organization) {
-    }
-
-    private record Proposal(int status, byte[] payloadHash, long deadline, String proposer, String proposerOrg,
-                            long createdHeight, List<Decision> decisions) {
-        long approvals() {
-            return decisions.stream().filter(d -> d.action == 1).count();
-        }
-    }
-
-    private static Proposal decodeProposal(StateReader.Entry entry) {
-        if (entry == null || !entry.present()) {
-            return null;
-        }
-        List<?> v = (List<?>) Cbor.decode(entry.value());
-        List<Decision> decisions = new ArrayList<>();
-        for (Object d : (List<?>) v.get(16)) {
-            List<?> decision = (List<?>) d;
-            decisions.add(new Decision(((Long) decision.get(0)).intValue(), (String) decision.get(1), (String) decision.get(2)));
-        }
-        return new Proposal(((Long) v.get(8)).intValue(), (byte[]) v.get(6), (Long) v.get(7), (String) v.get(9),
-                (String) v.get(10), (Long) v.get(15), decisions);
-    }
-
-    private static List<Fact> proposalFacts(String proposal, Proposal p) {
-        if (p == null) {
-            return List.of(Fact.of("Proposal", proposal), Fact.of("Status", "not found"));
-        }
-        List<Fact> facts = new ArrayList<>(List.of(Fact.of("Proposal", proposal), Fact.of("Status", PROPOSAL_STATUS[p.status]),
-                Fact.of("Proposed by", p.proposer + " (" + p.proposerOrg + ")"),
-                Fact.of("Approvals", p.approvals() + " of 2 (different organisations)"),
-                Fact.of("Deadline", "block " + p.deadline),
-                new Fact("Commitment", Hex.encode(p.payloadHash), "blake2b-256 of the release command (document fingerprint, id, reference)")));
-        for (Decision d : p.decisions) {
-            facts.add(Fact.of(d.action == 1 ? "Approved by" : "Rejected by", d.actor + " (" + d.organization + ")"));
-        }
-        return facts;
     }
 
     private static long count(StateReader.Entry entry) {

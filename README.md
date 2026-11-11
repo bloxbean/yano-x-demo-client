@@ -22,8 +22,9 @@ Research notes (payload formats, identities, APIs, risks): [`docs/research/`](do
 | workflow-chain (composite) | register → propose → approve → release, with the outbox effect confirming on chain | member |
 | document-review-chain | issuer proposes; two independent auditors approve; any member relays the release | actor (Ed25519) + member relay |
 | registry-audit-chain, approval-audit-chain | declarative binding cascades with provable receipts | member |
+| authenticated-map-chain (stock `authenticated-map` recipe) | issuer proposes a product release; two auditors of different organisations approve; a member writes it to `released-products`, consuming the approval once (people, roles and policy are in the chain's YAML) | actor (Ed25519) + member relay |
 
-Other chains on the cluster are listed as coming soon: roles-chain, authenticated-map (MPF/JMT), and the read-only
+Other chains on the cluster are listed as coming soon: roles-chain, authenticated-map-jmt-chain, and the read-only
 payments, settlement and Cardano history views.
 
 ## Chain configuration view
