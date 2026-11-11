@@ -26,6 +26,23 @@ Research notes (payload formats, identities, APIs, risks): [`docs/research/`](do
 Other chains on the cluster are listed as coming soon: roles-chain, authenticated-map (MPF/JMT), and the read-only
 payments, settlement and Cardano history views.
 
+## Chain configuration view
+
+Every chain (including ones without an interactive demo) has a **Config** tab with three views:
+
+- **As written:** the chain's entry in the `<app>.draft.yaml` the operators sealed, plus its bindings or role plan.
+- **Sealed genesis:** every setting fixed at seal (defaults included), from the sealed `<app>.chain`.
+- **Running:** the configuration parts of the node's `/status` (consensus limits, membership, sequencer, state
+  commitment, anchoring, effects, and for composite chains the components and workflow).
+
+The first two need the public app-chain files: set `demo.config-dir` (see `deploy/example-application.yml`) or open a
+file in the page (it stays in the browser). On a local cluster:
+
+```bash
+./showcase.sh quickstart --profile light --nodes 3 --instance demo     # in the Yano X distribution
+./mvnw quarkus:dev -Ddemo.config-dir=<distribution>/examples/showcase/data/showcase/demo ...
+```
+
 ## How it works
 
 - **Backend (Quarkus 3.39, Java 25).** It is the only client of the Yano nodes.

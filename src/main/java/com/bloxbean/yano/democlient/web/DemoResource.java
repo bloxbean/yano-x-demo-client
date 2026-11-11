@@ -5,10 +5,12 @@ import com.bloxbean.yano.democlient.chain.ChainModule;
 import com.bloxbean.yano.democlient.chain.MemberDirectory;
 import com.bloxbean.yano.democlient.chain.Specs;
 import com.bloxbean.yano.democlient.chain.StateReader;
+import com.bloxbean.yano.democlient.config.ConfigFiles;
 import com.bloxbean.yano.democlient.config.DemoConfig;
 import com.bloxbean.yano.democlient.node.NodeGateway;
 import com.bloxbean.yano.democlient.service.ClusterService;
 import com.bloxbean.yano.democlient.service.SubmissionService;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import io.smallrye.common.annotation.RunOnVirtualThread;
@@ -48,14 +50,16 @@ public class DemoResource {
     private final SubmissionService submissions;
     private final RateLimiter rateLimiter;
     private final ActorDirectory actors;
+    private final ConfigFiles configFiles;
     private final ObjectMapper json;
     private final Map<String, ChainModule> modules = new LinkedHashMap<>();
     private final AtomicLong sequence = new AtomicLong(System.currentTimeMillis() / 1000 % 100_000);
 
     public DemoResource(DemoConfig config, NodeGateway gateway, MemberDirectory members, ClusterService cluster,
                         SubmissionService submissions, RateLimiter rateLimiter, ObjectMapper json,
-                        ActorDirectory actors, Instance<ChainModule> all) {
+                        ActorDirectory actors, ConfigFiles configFiles, Instance<ChainModule> all) {
         this.actors = actors;
+        this.configFiles = configFiles;
         this.config = config;
         this.gateway = gateway;
         this.members = members;
@@ -184,6 +188,25 @@ public class DemoResource {
         }
         ClusterService.Proof proof = cluster.proof(gateway.resolve(node, nodeUrl), chainIdOrThrow(chainId), keyHex);
         return proof == null ? Response.status(502).entity(new Problem("proof unavailable")).build() : Response.ok(proof).build();
+    }
+
+    // ------------------------------------------------------------------ configuration
+
+    /** The cluster's public app-chain files from demo.config-dir; the UI slices them per chain. */
+    @GET
+    @Path("/config-files")
+    public ConfigFiles.Listing configFiles() {
+        return configFiles.listing();
+    }
+
+    /** The configuration parts of a chain's live status, from the chosen node (works for every hosted chain). */
+    @GET
+    @Path("/chains/{chainId}/live-config")
+    public Response liveConfig(@PathParam("chainId") String chainId, @QueryParam("node") String node,
+                               @QueryParam("nodeUrl") String nodeUrl) {
+        JsonNode live = cluster.liveConfig(gateway.resolve(node, nodeUrl), chainIdOrThrow(chainId));
+        return live == null ? Response.status(502).entity(new Problem("node status unavailable")).build()
+                : Response.ok(live).build();
     }
 
     // ------------------------------------------------------------------ commands

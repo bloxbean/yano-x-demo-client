@@ -33,6 +33,13 @@ public interface DemoConfig {
 
     Http http();
 
+    /**
+     * Directory with the cluster's public app-chain files (sealed {@code *.chain}, {@code *.draft.yaml}, bindings and
+     * role plans), shown in each chain's Configuration tab. Any layout: an `appchain new/seal` folder, a showcase.sh
+     * instance directory or a node's apps/ directory. Unset: the tab shows the live view and accepts uploads.
+     */
+    Optional<String> configDir();
+
     /** Cardano explorer link template for anchor / settlement transactions; {tx} is replaced. */
     @WithDefault("https://preprod.cardanoscan.io/transaction/{tx}")
     String explorerTxUrl();

@@ -3,6 +3,8 @@ import { Globe2, Info, Server } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, quorumText, type ClientConfig, type MemberInfo } from './api'
 import { Catalog } from './Catalog'
+import type { ConfigFile } from './chainConfig'
+import { ConfigPage } from './ConfigPage'
 import { Workspace } from './Workspace'
 import { Logo, go, useRoute } from './ui'
 
@@ -13,6 +15,9 @@ interface DemoContextValue {
   setReadNode: (node: string) => void
   submissions: { id: string; chainId: string }[]
   track: (id: string, chainId: string) => void
+  /** App-chain files the visitor opened in this page (kept in memory only, never sent anywhere). */
+  uploads: ConfigFile[]
+  addUploads: (files: ConfigFile[]) => void
 }
 
 const DemoContext = createContext<DemoContextValue | null>(null)
@@ -53,6 +58,11 @@ function DemoProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(READ_NODE_KEY, JSON.stringify(node)) } catch { /* private mode */ }
   }, [])
 
+  const [uploads, setUploads] = useState<ConfigFile[]>([])
+  const addUploads = useCallback((files: ConfigFile[]) => {
+    setUploads((previous) => [...files, ...previous.filter((p) => !files.some((f) => f.path === p.path))])
+  }, [])
+
   const track = useCallback((id: string, chainId: string) => {
     setSubmissions((previous) => {
       const next = [{ id, chainId }, ...previous].slice(0, 40)
@@ -62,8 +72,8 @@ function DemoProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(() => ({
-    config: config.data, members: members.data ?? [], readNode, setReadNode, submissions, track,
-  }), [config.data, members.data, readNode, setReadNode, submissions, track])
+    config: config.data, members: members.data ?? [], readNode, setReadNode, submissions, track, uploads, addUploads,
+  }), [config.data, members.data, readNode, setReadNode, submissions, track, uploads, addUploads])
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>
 }
@@ -129,7 +139,8 @@ export default function App() {
     <DemoProvider>
       <Header />
       <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
-        {route[0] === 'chain' && route[1] ? <Workspace chainId={route[1]} /> : <Catalog />}
+        {route[0] === 'chain' && route[1] ? <Workspace chainId={route[1]} />
+          : route[0] === 'config' && route[1] ? <ConfigPage chainId={route[1]} /> : <Catalog />}
       </main>
       <Footer />
     </DemoProvider>

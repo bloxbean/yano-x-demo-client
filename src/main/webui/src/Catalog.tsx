@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Anchor, ArrowRight, Blocks, CheckCircle2, MousePointerClick, ShieldCheck, Users } from 'lucide-react'
+import { Anchor, ArrowRight, Blocks, CheckCircle2, FileCog, MousePointerClick, ShieldCheck, Users } from 'lucide-react'
 import clsx from 'clsx'
 import { api, memberWord, quorumText, type ChainCard, type ClientConfig } from './api'
 import { useDemo } from './App'
@@ -69,13 +69,15 @@ export function Catalog() {
           <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-faint">Also running on this cluster</h2>
           <div className="flex flex-wrap gap-2">
             {others.map((card) => (
-              <span key={card.spec.id} className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs text-muted">
+              <button key={card.spec.id} onClick={() => go(`/config/${card.spec.id}`)} title="See how this chain is configured"
+                className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-accent/50 hover:text-accent">
                 <Blocks size={12} /> {card.spec.id}
                 <span className="text-faint">h {card.live.tipHeight}</span>
-              </span>
+                <FileCog size={12} className="text-faint" />
+              </button>
             ))}
           </div>
-          <p className="text-xs text-faint">Interactive demos for these chains are on the way.</p>
+          <p className="text-xs text-faint">Interactive demos for these chains are on the way; open one to see how it is configured.</p>
         </section>
       )}
     </div>

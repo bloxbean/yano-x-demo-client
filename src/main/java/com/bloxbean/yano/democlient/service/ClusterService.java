@@ -103,6 +103,57 @@ public class ClusterService {
         });
     }
 
+    private static final List<String> LIVE_TOP = List.of("chainId", "stateMachine", "members", "threshold",
+            "membershipMode", "membershipEpochFromHeight", "membershipActiveMembers", "membershipActiveThreshold",
+            "configuredBlockIntervalMs", "consensusProfile", "capabilityManifest", "stateMachineStatus", "tipHeight");
+    private static final List<String> LIVE_SEQUENCER = List.of("mode", "proposer", "consensusProtocol", "roundTimeoutMs");
+    private static final List<String> LIVE_COMMITMENT = List.of("profile", "backend", "commitmentFormatId",
+            "proofEncodingId", "formatFingerprint", "genesisId");
+    private static final List<String> LIVE_ANCHOR = List.of("enabled", "mode", "scriptAddress", "threadPolicyId", "bootstrapped");
+    private static final List<String> LIVE_EFFECTS = List.of("enabled", "maxPerBlock", "maxPayloadBytes",
+            "maxExpiryBlocks", "defaultGate", "outcomeCommitment");
+
+    /**
+     * How the chain is configured, as the node runs it: the configuration parts of /status (consensus limits,
+     * membership, sequencer, state commitment, anchoring, effects, and for composite chains the capability
+     * manifest). Counters, peers, wallet addresses and executor internals are left out.
+     */
+    public JsonNode liveConfig(NodeGateway.Target target, String chainId) {
+        return cached("liveConfig:" + target.url() + ":" + chainId, 10_000, () -> {
+            JsonNode status = read(target, "/api/v1/app-chain/chains/" + chainId + "/status");
+            if (status == null) {
+                return null;
+            }
+            com.fasterxml.jackson.databind.node.ObjectNode out = json.createObjectNode();
+            out.put("node", target.label());
+            copy(status, out, LIVE_TOP);
+            copy(status.path("sequencer"), out.putObject("sequencer"), LIVE_SEQUENCER);
+            JsonNode commitment = status.path("stateCommitment");
+            com.fasterxml.jackson.databind.node.ObjectNode c = out.putObject("stateCommitment");
+            copy(commitment, c, LIVE_COMMITMENT);
+            c.set("verificationTarget", commitment.path("implementation").path("verificationTarget"));
+            if (status.has("anchor")) {
+                copy(status.path("anchor"), out.putObject("anchor"), LIVE_ANCHOR);
+            }
+            if (status.has("effects")) {
+                com.fasterxml.jackson.databind.node.ObjectNode e = out.putObject("effects");
+                copy(status.path("effects"), e, LIVE_EFFECTS);
+                if (status.path("effects").has("executor")) {
+                    e.put("executorOnThisNode", status.path("effects").path("executor").path("enabled").asBoolean());
+                }
+            }
+            return out;
+        });
+    }
+
+    private static void copy(JsonNode from, com.fasterxml.jackson.databind.node.ObjectNode to, List<String> keys) {
+        for (String key : keys) {
+            if (from.has(key) && !from.get(key).isNull()) {
+                to.set(key, from.get(key));
+            }
+        }
+    }
+
     /** Chain ids hosted by the target node. */
     public List<String> chainIds(NodeGateway.Target target) {
         return cached("chains:" + target.url(), 10_000, () -> {

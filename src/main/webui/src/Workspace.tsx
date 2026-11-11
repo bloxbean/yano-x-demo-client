@@ -1,14 +1,15 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Activity, Anchor, ArrowLeft, Dices, FlaskConical, KeyRound, Lightbulb, Search, Send, ShieldCheck, UserRound } from 'lucide-react'
+import { Activity, Anchor, ArrowLeft, Dices, FileCog, FlaskConical, KeyRound, Lightbulb, Search, Send, ShieldCheck, UserRound } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import { api, quorumText, type ActorInfo, type ChainSpec, type Command, type Field, type LookupResult, type MemberInfo } from './api'
 import { useDemo } from './App'
+import { ConfigPanel } from './ConfigPanel'
 import { SubmissionList } from './Submissions'
 import { FactsGrid, ProofButton, VerifyPanel } from './Verify'
 import { Badge, Button, Card, LiveDot, Mono, Spinner, accent, go } from './ui'
 
-type Tab = 'try' | 'lookup' | 'activity' | 'verify'
+type Tab = 'try' | 'lookup' | 'activity' | 'verify' | 'config'
 
 /** Identifier fields carried from one command to the next within a chain (per page session). */
 const CARRIED = ['item', 'key', 'entity', 'order', 'proposal', 'release', 'content', 'reference']
@@ -40,6 +41,7 @@ export function Workspace({ chainId }: { chainId: string }) {
     { id: 'lookup', label: 'Look up', icon: Search, hidden: spec.lookups.length === 0 },
     { id: 'activity', label: 'Activity', icon: Activity },
     { id: 'verify', label: 'Verify', icon: ShieldCheck },
+    { id: 'config', label: 'Config', icon: FileCog },
   ]
 
   return (
@@ -86,6 +88,7 @@ export function Workspace({ chainId }: { chainId: string }) {
           {tab === 'lookup' && <Lookups spec={spec} />}
           {tab === 'activity' && <ActivityList chainId={spec.id} />}
           {tab === 'verify' && <VerifyPanel chainId={spec.id} live={live} />}
+          {tab === 'config' && <ConfigPanel chainId={spec.id} />}
         </div>
         <SubmissionList chainId={spec.id} anchor={live.anchor} />
       </div>
