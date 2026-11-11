@@ -23,8 +23,9 @@ Research notes (payload formats, identities, APIs, risks): [`docs/research/`](do
 | document-review-chain | issuer proposes; two independent auditors approve; any member relays the release | actor (Ed25519) + member relay |
 | registry-audit-chain, approval-audit-chain | declarative binding cascades with provable receipts | member |
 | authenticated-map-chain (stock `authenticated-map` recipe) | issuer proposes a product release; two auditors of different organisations approve; a member writes it to `released-products`, consuming the approval once (people, roles and policy are in the chain's YAML) | actor (Ed25519) + member relay |
+| roles-chain (stock `role-approval` recipe) | members onboard organisations, people and a policy at runtime by governance (`role bootstrap`); a proposer submits an application, a reviewer from another organisation approves or rejects; check an application against the decided hash | actor (Ed25519) + member relay |
 
-Other chains on the cluster are listed as coming soon: roles-chain, authenticated-map-jmt-chain, and the read-only
+Other chains on the cluster are listed as coming soon: authenticated-map-jmt-chain and the read-only
 payments, settlement and Cardano history views.
 
 ## Chain configuration view

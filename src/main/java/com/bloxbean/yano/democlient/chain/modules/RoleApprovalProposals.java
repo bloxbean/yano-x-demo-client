@@ -84,12 +84,17 @@ final class RoleApprovalProposals {
     }
 
     static List<Fact> facts(String proposal, Proposal p, String commitmentHint) {
+        return facts(proposal, p, commitmentHint, "2 (different organisations)");
+    }
+
+    /** required: e.g. "2 (different organisations)" or "1 reviewer from another organisation". */
+    static List<Fact> facts(String proposal, Proposal p, String commitmentHint, String required) {
         if (p == null) {
             return List.of(Fact.of("Proposal", proposal), Fact.of("Status", "not found"));
         }
         List<Fact> facts = new ArrayList<>(List.of(Fact.of("Proposal", proposal), Fact.of("Status", p.statusName()),
                 Fact.of("Proposed by", p.proposer + " (" + p.proposerOrg + ")"),
-                Fact.of("Approvals", p.approvals() + " of 2 (different organisations)"),
+                Fact.of("Approvals", p.approvals() + " of " + required),
                 Fact.of("Deadline", "block " + p.deadline),
                 new Fact("Commitment", Hex.encode(p.payloadHash), commitmentHint)));
         for (Decision d : p.decisions) {

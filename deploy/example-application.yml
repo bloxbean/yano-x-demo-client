@@ -43,3 +43,5 @@ demo:
     - { id: issuer-a, label: "Ines Alvarez", organization: acme-manufacturing, role: issuer, key-id: issuer-a-k1 }
     - { id: auditor-a, label: "Aiko Tanaka", organization: auditor-guild-a, role: auditor, key-id: auditor-a-k1 }
     - { id: auditor-b, label: "Bruno Keller", organization: auditor-guild-b, role: auditor, key-id: auditor-b-k1 }
+    - { id: proposer-a, label: "Priya Raman", organization: organization-a, role: proposer, key-id: proposer-key-v1 }
+    - { id: reviewer-a, label: "Tomás Oliveira", organization: organization-b, role: reviewer, key-id: reviewer-key-v1 }
