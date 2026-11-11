@@ -166,7 +166,9 @@ public class AuthenticatedMapModule implements ChainModule {
                             String why = switch (code == null ? "" : code) {
                                 case "APPROVAL_NOT_APPROVED" -> "the proposal is " + (p == null ? "missing" : p.statusName())
                                         + ", not APPROVED";
-                                case "APPROVAL_MISMATCH" -> "the product key or record differs from what the people approved";
+                                case "APPROVAL_MISMATCH" -> "this write (product key " + productId + " and its record) is not"
+                                        + " byte-for-byte what was proposed and approved. Use the same product key and record"
+                                        + " as in step 1";
                                 case "APPROVAL_REPLAY" -> "this approval was already consumed by an earlier release";
                                 case "WRONG_GENESIS" -> "the approval is bound to a different chain genesis";
                                 default -> code == null ? "an authorization check failed" : "the chain refused it (" + code + ")";
