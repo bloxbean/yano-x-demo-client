@@ -44,4 +44,17 @@ class AuthenticatedMapCodecTest {
         assertEquals(EVIDENCE, Hex.encode(evidence));
         assertEquals(COMMAND, Hex.encode(AuthenticatedMapModule.Codec.command(action, evidence)));
     }
+
+    @Test
+    void genesisIdFallsBackToTheSealedFile() {
+        String sealed = "{\"format\":\"yano-appchain-chain-v1\",\"genesis\":{\"chains\":[{\"id\":\"orders-chain\","
+                + "\"settings\":{\"state.genesis-id\":\"" + "1".repeat(64) + "\"}},{\"id\":\"authenticated-map-chain\","
+                + "\"settings\":{\"state.genesis-id\":\"" + GENESIS + "\"}}]}}";
+        var files = java.util.List.of(new com.bloxbean.yano.democlient.config.ConfigFiles.ConfigFile("x.draft.yaml",
+                        com.bloxbean.yano.democlient.config.ConfigFiles.Kind.DRAFT, "chains:\n"),
+                new com.bloxbean.yano.democlient.config.ConfigFiles.ConfigFile("showcase.chain",
+                        com.bloxbean.yano.democlient.config.ConfigFiles.Kind.SEALED, sealed));
+        assertEquals(GENESIS, AuthenticatedMapModule.sealedGenesisId(files, new com.fasterxml.jackson.databind.ObjectMapper()));
+        assertEquals(null, AuthenticatedMapModule.sealedGenesisId(java.util.List.of(), new com.fasterxml.jackson.databind.ObjectMapper()));
+    }
 }

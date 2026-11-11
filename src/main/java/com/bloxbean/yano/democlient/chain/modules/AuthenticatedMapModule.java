@@ -47,9 +47,14 @@ public class AuthenticatedMapModule implements ChainModule {
     private static final long DEADLINE_BLOCKS = 300;
 
     private final ActorDirectory actors;
+    private final com.bloxbean.yano.democlient.config.ConfigFiles configFiles;
+    private final com.fasterxml.jackson.databind.ObjectMapper json;
 
-    public AuthenticatedMapModule(ActorDirectory actors) {
+    public AuthenticatedMapModule(ActorDirectory actors, com.bloxbean.yano.democlient.config.ConfigFiles configFiles,
+                                  com.fasterxml.jackson.databind.ObjectMapper json) {
         this.actors = actors;
+        this.configFiles = configFiles;
+        this.json = json;
     }
 
     private static final List<Field> RELEASE_FIELDS = List.of(
@@ -313,14 +318,45 @@ public class AuthenticatedMapModule implements ChainModule {
         return in.text("note", "Release record", 4000).getBytes(StandardCharsets.UTF_8);
     }
 
-    /** The authenticated map's genesis id (signed into every approval payload), from the node's domain API. */
-    private static byte[] genesisId(StateReader reader) {
+    /**
+     * The authenticated map's genesis id (signed into every approval payload): from the node's domain API, or, while
+     * the chain has no committed block yet (the API then has nothing to answer from), from the sealed file's
+     * {@code state.genesis-id} setting of this chain in demo.config-dir (the same value).
+     */
+    private byte[] genesisId(StateReader reader) {
         JsonNode metadata = reader.plugin(STDLIB, "authenticated-map");
         String id = metadata == null ? "" : metadata.path("record").path("genesisId").asText("");
         if (!id.matches("[0-9a-f]{64}")) {
-            throw new InvalidInput("The node did not report the authenticated map's genesis; try again");
+            id = sealedGenesisId(configFiles.listing().files(), json);
+        }
+        if (id == null || !id.matches("[0-9a-f]{64}")) {
+            throw new InvalidInput("The authenticated map's genesis id is not available yet: the chain has no block and"
+                    + " no sealed file is configured (demo.config-dir)");
         }
         return Hex.decode(id);
+    }
+
+    /** {@code state.genesis-id} of authenticated-map-chain in the first sealed file that declares it, or null. */
+    static String sealedGenesisId(List<com.bloxbean.yano.democlient.config.ConfigFiles.ConfigFile> files,
+                                  com.fasterxml.jackson.databind.ObjectMapper json) {
+        for (var file : files) {
+            if (file.kind() != com.bloxbean.yano.democlient.config.ConfigFiles.Kind.SEALED) {
+                continue;
+            }
+            try {
+                for (JsonNode chain : json.readTree(file.content()).path("genesis").path("chains")) {
+                    if (CHAIN.equals(chain.path("id").asText())) {
+                        String id = chain.path("settings").path("state.genesis-id").asText("");
+                        if (id.matches("[0-9a-f]{64}")) {
+                            return id;
+                        }
+                    }
+                }
+            } catch (java.io.IOException malformed) {
+                // not a readable sealed file; try the next one
+            }
+        }
+        return null;
     }
 
     /** The composite state key of the entry, as the node reports it (never built by hand). */
