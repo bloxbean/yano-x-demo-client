@@ -28,7 +28,17 @@ public interface DemoConfig {
 
     RateLimit rateLimit();
 
+    /** The cluster's consensus quorum, shown in texts and used to read finality certificates. */
+    Quorum quorum();
+
     Http http();
+
+    /**
+     * Directory with the cluster's public app-chain files (sealed {@code *.chain}, {@code *.draft.yaml}, bindings and
+     * role plans), shown in each chain's Configuration tab. Any layout: an `appchain new/seal` folder, a showcase.sh
+     * instance directory or a node's apps/ directory. Unset: the tab shows the live view and accepts uploads.
+     */
+    Optional<String> configDir();
 
     /** Cardano explorer link template for anchor / settlement transactions; {tx} is replaced. */
     @WithDefault("https://preprod.cardanoscan.io/transaction/{tx}")
@@ -79,6 +89,21 @@ public interface DemoConfig {
         /** Only https URLs whose host matches this pattern are accepted; private/loopback addresses are always refused. */
         @WithDefault("[a-z0-9.-]+")
         String hostPattern();
+    }
+
+    interface Quorum {
+        /** Members whose signatures finalize a block (the sealed threshold). */
+        @WithDefault("4")
+        int threshold();
+
+        /** Members of the cluster. */
+        @WithDefault("5")
+        int members();
+
+        /** "4 of 5" */
+        default String text() {
+            return threshold() + " of " + members();
+        }
     }
 
     interface RateLimit {

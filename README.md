@@ -22,9 +22,28 @@ Research notes (payload formats, identities, APIs, risks): [`docs/research/`](do
 | workflow-chain (composite) | register → propose → approve → release, with the outbox effect confirming on chain | member |
 | document-review-chain | issuer proposes; two independent auditors approve; any member relays the release | actor (Ed25519) + member relay |
 | registry-audit-chain, approval-audit-chain | declarative binding cascades with provable receipts | member |
+| authenticated-map-chain (stock `authenticated-map` recipe) | issuer proposes a product release; two auditors of different organisations approve; a member writes it to `released-products`, consuming the approval once (people, roles and policy are in the chain's YAML) | actor (Ed25519) + member relay |
+| roles-chain (stock `role-approval` recipe) | members onboard organisations, people and a policy at runtime by governance (`role bootstrap`); a proposer submits an application, a reviewer from another organisation approves or rejects; check an application against the decided hash | actor (Ed25519) + member relay |
 
-Other chains on the cluster are listed as coming soon: roles-chain, authenticated-map (MPF/JMT), and the read-only
+Other chains on the cluster are listed as coming soon: authenticated-map-jmt-chain and the read-only
 payments, settlement and Cardano history views.
+
+## Chain configuration view
+
+Every chain (including ones without an interactive demo) has a **Config** tab with three views:
+
+- **As written:** the chain's entry in the `<app>.draft.yaml` the operators sealed, plus its bindings or role plan.
+- **Sealed genesis:** every setting fixed at seal (defaults included), from the sealed `<app>.chain`.
+- **Running:** the configuration parts of the node's `/status` (consensus limits, membership, sequencer, state
+  commitment, anchoring, effects, and for composite chains the components and workflow).
+
+The first two need the public app-chain files: set `demo.config-dir` (see `deploy/example-application.yml`) or open a
+file in the page (it stays in the browser). On a local cluster:
+
+```bash
+./showcase.sh quickstart --profile light --nodes 3 --instance demo     # in the Yano X distribution
+./mvnw quarkus:dev -Ddemo.config-dir=<distribution>/examples/showcase/data/showcase/demo ...
+```
 
 ## How it works
 

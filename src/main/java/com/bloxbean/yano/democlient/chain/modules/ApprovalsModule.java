@@ -37,7 +37,7 @@ public class ApprovalsModule implements ChainModule {
                     + " Votes are cast by member organisations, so pick who you act as.",
             "approvals", "Workflows", List.of("quorum", "voting", "proofs"), false, "mint",
             List.of(new Specs.Command("propose", "Propose an item", "Open an item for approval.",
-                            "A business quorum (e.g. 2 approvals) on top of the consensus quorum (4 of 5 signatures).",
+                            "A business quorum (e.g. 2 approvals) on top of the consensus quorum (the member signatures that finalize every block).",
                             Specs.PersonaKind.MEMBER, List.of(),
                             List.of(Field.text("item", "Item id", MAX_ITEM, "Unique id, e.g. purchase-order-7").withPattern(ITEM_RULE),
                                     Field.textarea("payload", "What is being approved", 1024, "Public, permanent text"),

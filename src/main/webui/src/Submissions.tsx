@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Anchor, CheckCircle2, CircleDashed, Clock3, PenLine, Send, XCircle } from 'lucide-react'
 import clsx from 'clsx'
-import { ApiError, api, explorerLink, short, type Anchor as AnchorInfo, type Stage, type Submission } from './api'
+import { ApiError, api, explorerLink, quorumText, short, type Anchor as AnchorInfo, type Stage, type Submission } from './api'
 import { useDemo } from './App'
 import { FactsGrid, ProofButton } from './Verify'
 import { Badge, Card, LiveDot, Mono, STATUS_STYLE, Spinner } from './ui'
@@ -9,7 +9,7 @@ import { Badge, Card, LiveDot, Mono, STATUS_STYLE, Spinner } from './ui'
 const TERMINAL: Stage[] = ['EVALUATED', 'REFUSED', 'FAILED']
 
 export function SubmissionList({ chainId, anchor }: { chainId: string; anchor: AnchorInfo | null }) {
-  const { submissions } = useDemo()
+  const { config, submissions } = useDemo()
   const mine = submissions.filter((s) => s.chainId === chainId)
   return (
     <div className="space-y-3 lg:sticky lg:top-20 lg:self-start">
@@ -22,7 +22,7 @@ export function SubmissionList({ chainId, anchor }: { chainId: string; anchor: A
           <Send className="mx-auto text-faint" size={22} />
           <div className="mt-2 text-sm font-medium">Nothing submitted yet</div>
           <p className="mt-1 text-xs text-muted">
-            Submit something on the left. You will see it get signed, ordered into a block, finalized by 4 of 5 members,
+            Submit something on the left. You will see it get signed, ordered into a block, finalized by {quorumText(config)} members,
             evaluated against the chain's rules, proven, and anchored on Cardano.
           </p>
         </Card>

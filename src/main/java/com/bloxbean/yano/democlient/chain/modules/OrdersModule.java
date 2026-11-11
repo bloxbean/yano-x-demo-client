@@ -23,7 +23,7 @@ public class OrdersModule implements ChainModule {
 
     private static final Specs.Chain SPEC = new Specs.Chain(
             "orders-chain", "Order log", "An ordered event log that no single party can rewrite",
-            "Every order event is appended to one shared log. All five members agree on exactly which events exist and"
+            "Every order event is appended to one shared log. All members agree on exactly which events exist and"
                     + " in what order; each entry is provable against a state root that is anchored on Cardano.",
             "ordered-log", "Foundations", List.of("ordering", "audit trail", "proofs"), false, "cyan",
             List.of(new Specs.Command("append", "Append an order event",

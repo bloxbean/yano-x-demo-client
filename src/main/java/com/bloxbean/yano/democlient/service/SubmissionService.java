@@ -2,6 +2,7 @@ package com.bloxbean.yano.democlient.service;
 
 import com.bloxbean.yano.democlient.chain.ChainModule;
 import com.bloxbean.yano.democlient.chain.MemberDirectory;
+import com.bloxbean.yano.democlient.config.DemoConfig;
 import com.bloxbean.yano.democlient.chain.StateReader;
 import com.bloxbean.yano.democlient.codec.Cbor;
 import com.bloxbean.yano.democlient.codec.Hex;
@@ -37,11 +38,13 @@ public class SubmissionService {
     private final NodeGateway gateway;
     private final MemberDirectory members;
     private final ObjectMapper json;
+    private final DemoConfig.Quorum quorum;
     private final Map<String, Submission> submissions = new ConcurrentHashMap<>();
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
     private final Semaphore inFlight = new Semaphore(64);
 
-    public SubmissionService(NodeGateway gateway, MemberDirectory members, ObjectMapper json) {
+    public SubmissionService(NodeGateway gateway, MemberDirectory members, ObjectMapper json, DemoConfig config) {
+        this.quorum = config.quorum();
         this.gateway = gateway;
         this.members = members;
         this.json = json;
@@ -181,8 +184,8 @@ public class SubmissionService {
         s.height = finalized.path("height").asLong();
         s.index = finalized.path("index").asInt();
         String sender = finalized.path("sender").asText();
-        s.event(Stage.FINALIZED, "Finalized in block " + s.height + " (position " + s.index + ") with a 4-of-5"
-                + " finality certificate");
+        s.event(Stage.FINALIZED, "Finalized in block " + s.height + " (position " + s.index + ") with a " + quorum.threshold() + "-of-"
+                + quorum.members() + " finality certificate");
 
         Map<String, StateReader.Entry> before = read(reader, s.prepared.probes(), s.height - 1);
         if (before.values().stream().anyMatch(e -> "UNAVAILABLE".equals(e.presence()))) {

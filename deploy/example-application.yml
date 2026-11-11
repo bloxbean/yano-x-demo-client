@@ -22,6 +22,15 @@ demo:
     enabled: false
     host-pattern: "[a-z0-9-]+\\.example\\.org"
   explorer-tx-url: "https://preprod.cardanoscan.io/transaction/{tx}"
+  # Optional: the cluster's public app-chain files (sealed *.chain, *.draft.yaml, *.bindings.yaml, *.role-plan.yaml),
+  # shown in each chain's Config tab. Any layout: the folder where `yano.sh appchain new/seal` ran, a showcase.sh
+  # instance (data/showcase/<instance>) or a copy of a node's apps/ directory. Secrets/data/logs dirs are never read.
+  # Unset: the tab shows the node's live configuration and lets visitors open a file in their browser.
+  # config-dir: /etc/yano-x-demo-client/chains
+  # The cluster's consensus quorum (signatures per block, members), shown in texts and proofs.
+  quorum:
+    threshold: 4
+    members: 5
   rate-limit:
     per-client-per-minute: 20
     global-per-minute: 120
@@ -34,3 +43,5 @@ demo:
     - { id: issuer-a, label: "Ines Alvarez", organization: acme-manufacturing, role: issuer, key-id: issuer-a-k1 }
     - { id: auditor-a, label: "Aiko Tanaka", organization: auditor-guild-a, role: auditor, key-id: auditor-a-k1 }
     - { id: auditor-b, label: "Bruno Keller", organization: auditor-guild-b, role: auditor, key-id: auditor-b-k1 }
+    - { id: proposer-a, label: "Priya Raman", organization: organization-a, role: proposer, key-id: proposer-key-v1 }
+    - { id: reviewer-a, label: "Tomás Oliveira", organization: organization-b, role: reviewer, key-id: reviewer-key-v1 }

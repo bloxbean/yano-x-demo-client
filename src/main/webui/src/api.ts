@@ -1,4 +1,5 @@
 // Typed client for the demo backend (/api/demo). The browser never talks to Yano nodes directly.
+import type { ConfigListing } from './chainConfig'
 
 export type PersonaKind = 'MEMBER' | 'ACTOR' | 'NONE'
 export type Status = 'APPLIED' | 'NO_EFFECT' | 'REJECTED' | 'RECORDED'
@@ -11,6 +12,19 @@ export interface ClientConfig {
   customNodeEnabled: boolean
   explorerTxUrl: string
   writesPerMinute: number
+  /** Signatures that finalize a block, and the cluster's member count (demo.quorum.*). */
+  threshold: number
+  memberCount: number
+}
+
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+/** "3 of 5", from the deployment's quorum (falls back to the pre3 showcase's 4 of 5 until the config loads). */
+export const quorumText = (c?: ClientConfig) => `${c?.threshold ?? 4} of ${c?.memberCount ?? 5}`
+/** "Five", "Three", … for prose. */
+export const memberWord = (c?: ClientConfig) => {
+  const n = c?.memberCount ?? 5
+  const w = NUMBER_WORDS[n] ?? String(n)
+  return w.charAt(0).toUpperCase() + w.slice(1)
 }
 export interface ActorInfo { id: string; label: string; organization: string; role: string; keyId: string; publicKey: string }
 export interface MemberInfo { nodeId: string; label: string; memberKey: string | null; shortKey: string | null }
@@ -64,6 +78,20 @@ export interface Proof {
   blockHash: string | null; proofWireHex: string | null; signers: Signer[]; threshold: number; memberCount: number
 }
 
+/** Configuration parts of a chain's /status on one node (see ClusterService.liveConfig). */
+export interface LiveConfig {
+  node: string; chainId: string; stateMachine?: string; members?: number; threshold?: number; membershipMode?: string
+  membershipEpochFromHeight?: number; membershipActiveMembers?: number; membershipActiveThreshold?: number
+  configuredBlockIntervalMs?: number; tipHeight?: number
+  consensusProfile?: { maxMessageBytes?: number; maxBlockMessages?: number; maxBlockBytes?: number; l1StabilityDepth?: number; effectsEnabled?: boolean; digest?: string }
+  sequencer?: { mode?: string; proposer?: string; consensusProtocol?: string; roundTimeoutMs?: number }
+  stateCommitment?: { profile?: string; backend?: string; verificationTarget?: string; genesisId?: string }
+  anchor?: { enabled?: boolean; mode?: string; scriptAddress?: string; bootstrapped?: boolean }
+  effects?: { enabled?: boolean; defaultGate?: string; maxPerBlock?: number; executorOnThisNode?: boolean }
+  capabilityManifest?: unknown
+  stateMachineStatus?: unknown
+}
+
 export class ApiError extends Error {
   readonly status: number
   constructor(status: number, message: string) {
@@ -102,6 +130,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const nodeQuery = (node?: string) => (node ? `?node=${encodeURIComponent(node)}` : '')
 
 export const api = {
+  configFiles: () => request<ConfigListing>('/config-files'),
+  liveConfig: (id: string, node?: string) => request<LiveConfig>(`/chains/${id}/live-config${nodeQuery(node)}`),
   config: () => request<ClientConfig>('/config'),
   members: () => request<MemberInfo[]>('/members'),
   actors: () => request<ActorInfo[]>('/actors'),

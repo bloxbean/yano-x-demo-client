@@ -1,18 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
-import { Anchor, ArrowRight, Blocks, CheckCircle2, MousePointerClick, ShieldCheck, Users } from 'lucide-react'
+import { Anchor, ArrowRight, Blocks, CheckCircle2, FileCog, MousePointerClick, ShieldCheck, Users } from 'lucide-react'
 import clsx from 'clsx'
-import { api, type ChainCard } from './api'
+import { api, memberWord, quorumText, type ChainCard, type ClientConfig } from './api'
 import { useDemo } from './App'
 import { Badge, Card, LiveDot, Spinner, accent, go } from './ui'
 
-const STEPS = [
+const steps = (config?: ClientConfig) => [
   { icon: MousePointerClick, title: 'Pick a ledger', text: 'Each app ledger runs its own state machine — logs, registries, approvals, balances, documents.' },
-  { icon: Users, title: 'Act as a member', text: 'Five organisations run the cluster. Choose who you are; your message is signed by that member.' },
-  { icon: ShieldCheck, title: 'Watch it finalize', text: '4 of 5 members sign every block. See the outcome, a state proof, and the Cardano anchor.' },
+  { icon: Users, title: 'Act as a member', text: `${memberWord(config)} organisations run the cluster. Choose who you are; your message is signed by that member.` },
+  { icon: ShieldCheck, title: 'Watch it finalize', text: `${quorumText(config)} members sign every block. See the outcome, a state proof, and the Cardano anchor.` },
 ]
 
 export function Catalog() {
-  const { readNode } = useDemo()
+  const { readNode, config } = useDemo()
+  const STEPS = steps(config)
   const chains = useQuery({
     queryKey: ['chains', readNode], queryFn: () => api.chains(readNode), refetchInterval: 8_000, enabled: !!readNode,
   })
@@ -27,7 +28,7 @@ export function Catalog() {
     <div className="space-y-10">
       <section className="rise grid gap-8 pt-4 lg:grid-cols-[1.2fr_1fr] lg:items-end">
         <div>
-          <Badge tone="accent"><LiveDot /> Live on a 5-member cluster</Badge>
+          <Badge tone="accent"><LiveDot /> Live on a {config?.memberCount ?? 5}-member cluster</Badge>
           <h1 className="mt-4 text-4xl font-bold leading-[1.05] sm:text-5xl">
             Try Yano X app ledgers, <span className="bg-gradient-to-r from-accent to-lime bg-clip-text text-transparent">for real.</span>
           </h1>
@@ -68,13 +69,15 @@ export function Catalog() {
           <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-faint">Also running on this cluster</h2>
           <div className="flex flex-wrap gap-2">
             {others.map((card) => (
-              <span key={card.spec.id} className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs text-muted">
+              <button key={card.spec.id} onClick={() => go(`/config/${card.spec.id}`)} title="See how this chain is configured"
+                className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-accent/50 hover:text-accent">
                 <Blocks size={12} /> {card.spec.id}
                 <span className="text-faint">h {card.live.tipHeight}</span>
-              </span>
+                <FileCog size={12} className="text-faint" />
+              </button>
             ))}
           </div>
-          <p className="text-xs text-faint">Interactive demos for these chains are on the way.</p>
+          <p className="text-xs text-faint">Interactive demos for these chains are on the way; open one to see how it is configured.</p>
         </section>
       )}
     </div>
