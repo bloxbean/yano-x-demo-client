@@ -94,7 +94,7 @@ export function CardanoTab({ chainId }: { chainId: string }) {
   const useCase = CARDANO_CHAINS[chainId]
   return (
     <div className="space-y-4">
-      {chain && <AnchorStrip chain={chain} />}
+      {chain && <AnchorStrip chain={chain} onPopulate={() => cardano.populate(chainId).then((r) => jobs.track(r.job))} />}
       {useCase === 'certificates' && <Certificates overview={overview.data} track={jobs.track} />}
       {useCase === 'escrow' && <Escrows track={jobs.track} />}
       {useCase === 'rewards' && <Rewards overview={overview.data} track={jobs.track} />}
@@ -104,8 +104,9 @@ export function CardanoTab({ chainId }: { chainId: string }) {
   )
 }
 
-function AnchorStrip({ chain }: { chain: CardanoChain }) {
+function AnchorStrip({ chain, onPopulate }: { chain: CardanoChain; onPopulate: () => Promise<void> }) {
   const a = chain.anchor
+  const [error, setError] = useState<string | null>(null)
   return (
     <Card className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 text-sm">
       <span className="flex items-center gap-2 font-semibold"><Anchor size={15} className="text-lime" /> Anchored on Cardano at <span className="font-mono">{a?.height ?? '—'}</span></span>
@@ -114,6 +115,13 @@ function AnchorStrip({ chain }: { chain: CardanoChain }) {
         ? <span className="text-amber">{chain.blocksToAnchor} blocks to the next anchor (or ≤ 60 min)</span>
         : <span className="text-lime">due now</span>}
       {a && <span className="text-xs text-faint">co-signed by {a.threshold} of {a.members} · <TxLink tx={a.utxoTx} label="anchor UTxO" /></span>}
+      {chain.tip > (a?.height ?? 0) && (
+        <Button variant="ghost" className="ml-auto py-1 text-xs" title="Write demo blocks until the chain is due, then wait for the anchor"
+          onClick={() => { setError(null); onPopulate().catch((e: Error) => setError(e.message)) }}>
+          <RefreshCw size={13} /> Populate until anchored
+        </Button>
+      )}
+      {error && <span className="w-full text-xs text-rose">{error}</span>}
     </Card>
   )
 }
