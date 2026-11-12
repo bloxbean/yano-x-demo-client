@@ -884,8 +884,12 @@ public class CardanoService {
             write(chainId, "mint", "node-0", null, Map.of("account", all.get(r.nextInt(all.size())).memberKey(),
                     "amount", Integer.toString(1 + r.nextInt(25))));
         } else if (chainId.equals(config.certificatesChain())) {
-            write(chainId, "propose", "node-0", "issuer-a", Map.of("proposal", "fill-" + tag + "-" + i,
+            // Propose, then reject at once: two blocks, and nothing is left pending. role-approvals allows only
+            // 64 pending proposals per proposer, and every demo proposal comes from issuer-a.
+            String proposal = "fill-" + tag + "-" + i;
+            write(chainId, "propose", "node-0", "issuer-a", Map.of("proposal", proposal,
                     "entity", "draft-" + i, "content", "Draft " + i, "reference", "dms://drafts/" + i));
+            write(chainId, "reject", "node-0", "auditor-a", Map.of("proposal", proposal));
         } else {
             throw new IllegalArgumentException("populate supports the three On Cardano chains only");
         }
