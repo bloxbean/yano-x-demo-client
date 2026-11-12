@@ -30,6 +30,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.quarkus.runtime.Startup;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -57,6 +58,7 @@ import java.util.function.UnaryOperator;
  * (onchain/validators). The server holds a testnet wallet that pays the fees; validators are parameterised at
  * runtime from the checked-in blueprint with julc ({@link ScriptParams}).
  */
+@Startup
 @ApplicationScoped
 @RegisterForReflection(targets = {com.bloxbean.cardano.client.api.model.ProtocolParams.class})
 public class CardanoService {
@@ -106,7 +108,11 @@ public class CardanoService {
             reason = "demo.cardano.wallet-mnemonic-file is not set";
         } else {
             try {
-                String phrase = secret(this.config.walletMnemonicFile().get());
+                Path walletFile = Path.of(this.config.walletMnemonicFile().get());
+                if (this.config.createWallet() && !Files.exists(walletFile)) {
+                    createWallet(walletFile);
+                }
+                String phrase = secret(walletFile.toString());
                 w = Account.createFromMnemonic(Networks.preprod(), phrase);
                 s = new Account(Networks.preprod(), phrase, 1);
                 chain = new L1(gateway.defaultTarget().url(), config.http().apiKeyFile().map(CardanoService::secret),
@@ -121,11 +127,26 @@ public class CardanoService {
             }
         }
         this.disabledReason = reason;
+        if (reason == null) {
+            LOG.infof("On Cardano wallet: %s (fund it with test ADA)", w.baseAddress());
+        }
         this.wallet = reason == null ? w : null;
         this.supplier = reason == null ? s : null;
         this.l1 = chain;
         this.store = st;
         this.blueprint = bp;
+    }
+
+    /** A fresh testnet wallet; the recovery phrase goes only to the owner-only file, never to the log. */
+    private static void createWallet(Path file) throws IOException {
+        if (file.getParent() != null) {
+            Files.createDirectories(file.getParent());
+        }
+        Account account = new Account(Networks.preprod());
+        Files.createFile(file, java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+                java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
+        Files.writeString(file, account.mnemonic(), StandardCharsets.UTF_8);
+        LOG.infof("On Cardano: created a new testnet wallet in %s", file);
     }
 
     private static String secret(String file) {

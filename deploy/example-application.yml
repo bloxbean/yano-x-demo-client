@@ -48,7 +48,10 @@ demo:
   # Optional On Cardano features (see README). Testnets only: the wallet pays every fee.
   cardano:
     enabled: false
-    wallet-mnemonic-file: /etc/yano-x-demo-client/cardano-wallet.mnemonic    # 0600, owned by the service user
+    # The service creates the wallet on first start (create-wallet) and logs only its address. /etc is read-only
+    # to the service, so wallet and state live in its StateDirectory.
+    wallet-mnemonic-file: /var/lib/yano-x-demo-client/cardano-wallet.mnemonic
+    create-wallet: true
     state-file: /var/lib/yano-x-demo-client/cardano-state.json
     operator-token-file: /etc/yano-x-demo-client/operator.token               # required for a public deployment
     # admin-api-key-file: /etc/yano-x-demo-client/node-admin.key              # enables "Anchor now"

@@ -138,6 +138,13 @@ public interface DemoConfig {
         /** File holding the demo wallet's recovery phrase (testnets only). Never logged, never sent to browsers. */
         Optional<String> walletMnemonicFile();
 
+        /**
+         * Create a new testnet wallet in {@code wallet-mnemonic-file} (0600) on start when the file does not exist.
+         * Only the address is logged; fund it, then use it as is.
+         */
+        @WithDefault("false")
+        boolean createWallet();
+
         /** Where registries, claimed sets and escrows are kept (the claimed-set roots are also on chain). */
         @WithDefault("data/cardano-state.json")
         String stateFile();
