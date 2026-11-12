@@ -8,6 +8,7 @@
     <properties>
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <maven.compiler.release>25</maven.compiler.release>
+        <cardano-client.version>0.8.0-pre7</cardano-client.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
@@ -50,6 +51,24 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
+        </dependency>
+        <!-- On Cardano: transaction building and MPF tries (no Blockfrost/Retrofit backend: we talk to the
+             members' own Blockfrost-compatible API with the JDK HTTP client). -->
+        <dependency>
+            <groupId>com.bloxbean.cardano</groupId>
+            <artifactId>cardano-client-quicktx</artifactId>
+            <version>${cardano-client.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bloxbean.cardano</groupId>
+            <artifactId>cardano-client-merkle-patricia-forestry</artifactId>
+            <version>${cardano-client.version}</version>
+        </dependency>
+        <!-- UPLC flat codec: applies deployment parameters to the checked-in Aiken blueprint. -->
+        <dependency>
+            <groupId>com.bloxbean.cardano</groupId>
+            <artifactId>julc-core</artifactId>
+            <version>0.1.0-pre16</version>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>

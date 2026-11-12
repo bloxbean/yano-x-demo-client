@@ -17,6 +17,10 @@ quarkus:
     enable-spa-routing: true
     dev-server:
       port: 5188
+  native:
+    # The checked-in Aiken blueprint the On Cardano validators are built from.
+    resources:
+      includes: cardano/**
   log:
     level: INFO
     console:

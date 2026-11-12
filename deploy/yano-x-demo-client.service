@@ -30,6 +30,9 @@ LockPersonality=true
 RestrictNamespaces=true
 CapabilityBoundingSet=
 ReadOnlyPaths=/etc/yano-x-demo-client
+# Writable state (On Cardano wallet and claims): /var/lib/yano-x-demo-client, owned by the service user.
+StateDirectory=yano-x-demo-client
+StateDirectoryMode=0700
 SyslogIdentifier=yano-x-demo-client
 
 [Install]

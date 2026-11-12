@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { Globe2, Info, Server } from 'lucide-react'
+import { Anchor, Globe2, Info, Server } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, quorumText, type ClientConfig, type MemberInfo } from './api'
 import { Catalog } from './Catalog'
 import type { ConfigFile } from './chainConfig'
 import { ConfigPage } from './ConfigPage'
+import { CardanoPage, useCardano } from './OnCardano'
 import { Workspace } from './Workspace'
 import { Logo, go, useRoute } from './ui'
 
@@ -80,6 +81,7 @@ function DemoProvider({ children }: { children: ReactNode }) {
 
 function Header() {
   const { config, readNode, setReadNode } = useDemo()
+  const onCardano = useCardano()
   return (
     <header className="sticky top-0 z-30 border-b border-line/70 bg-surface/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
@@ -96,6 +98,12 @@ function Header() {
           </span>
         </button>
         <div className="ml-auto flex items-center gap-2">
+          {onCardano.data?.enabled && (
+            <button onClick={() => go('/cardano')} title="Validators on Cardano that act on anchored app-ledger facts"
+              className="inline-flex items-center gap-1.5 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-[12px] font-medium text-lime hover:bg-lime/15">
+              <Anchor size={12} /> Anchor &amp; mint
+            </button>
+          )}
           <span className="hidden items-center gap-1.5 rounded-full border border-amber/30 bg-amber/10 px-3 py-1 text-[11px] font-medium text-amber md:inline-flex"
             title="Everything submitted here is written to a public test network and is permanent.">
             <Globe2 size={12} /> Public test network · data is permanent
@@ -139,7 +147,8 @@ export default function App() {
     <DemoProvider>
       <Header />
       <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
-        {route[0] === 'chain' && route[1] ? <Workspace chainId={route[1]} />
+        {route[0] === 'cardano' ? <CardanoPage />
+          : route[0] === 'chain' && route[1] ? <Workspace chainId={route[1]} />
           : route[0] === 'config' && route[1] ? <ConfigPage chainId={route[1]} /> : <Catalog />}
       </main>
       <Footer />
