@@ -54,3 +54,7 @@ src/main/webui/node_modules/
 config/local/
 *.seed
 *.key
+
+# On Cardano: local state and wallet files (never commit)
+data/
+*.mnemonic

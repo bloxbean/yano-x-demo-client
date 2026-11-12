@@ -45,3 +45,13 @@ demo:
     - { id: auditor-b, label: "Bruno Keller", organization: auditor-guild-b, role: auditor, key-id: auditor-b-k1 }
     - { id: proposer-a, label: "Priya Raman", organization: organization-a, role: proposer, key-id: proposer-key-v1 }
     - { id: reviewer-a, label: "Tomás Oliveira", organization: organization-b, role: reviewer, key-id: reviewer-key-v1 }
+  # Optional On Cardano features (see README). Testnets only: the wallet pays every fee.
+  cardano:
+    enabled: false
+    wallet-mnemonic-file: /etc/yano-x-demo-client/cardano-wallet.mnemonic    # 0600, owned by the service user
+    state-file: /var/lib/yano-x-demo-client/cardano-state.json
+    operator-token-file: /etc/yano-x-demo-client/operator.token               # required for a public deployment
+    # admin-api-key-file: /etc/yano-x-demo-client/node-admin.key              # enables "Anchor now"
+    transactions-per-hour: 40
+    escrow-ada: 10
+    anchor-every-blocks: 30                                                   # the cluster's sealed anchor schedule

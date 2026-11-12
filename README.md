@@ -20,13 +20,45 @@ Research notes (payload formats, identities, APIs, risks): [`docs/research/`](do
 | documents-chain (doc-trail) | record document fingerprints; the trail head is recomputed and verified | member |
 | approvals-chain | propose and vote to a quorum; duplicate and terminal votes are ignored | member |
 | workflow-chain (composite) | register → propose → approve → release, with the outbox effect confirming on chain | member |
-| document-review-chain | issuer proposes; two independent auditors approve; any member relays the release | actor (Ed25519) + member relay |
+| document-review-chain | issuer proposes; two independent auditors approve; any member relays the release; On Cardano: mint a certified release NFT | actor (Ed25519) + member relay |
 | registry-audit-chain, approval-audit-chain | declarative binding cascades with provable receipts | member |
 | authenticated-map-chain (stock `authenticated-map` recipe) | issuer proposes a product release; two auditors of different organisations approve; a member writes it to `released-products`, consuming the approval once (people, roles and policy are in the chain's YAML) | actor (Ed25519) + member relay |
 | roles-chain (stock `role-approval` recipe) | members onboard organisations, people and a policy at runtime by governance (`role bootstrap`); a proposer submits an application, a reviewer from another organisation approves or rejects; check an application against the decided hash | actor (Ed25519) + member relay |
 
 Other chains on the cluster are listed as coming soon: authenticated-map-jmt-chain and the read-only
 payments, settlement and Cardano history views.
+
+## On Cardano: act on anchored facts
+
+Optional (`demo.cardano.enabled`). Three Aiken validators on Cardano read a chain's **script anchor** as a reference
+input, prove an app-ledger fact against its state root with the official
+[`aiken-lang/merkle-patricia-forestry`](https://github.com/aiken-lang/merkle-patricia-forestry) (v2.1.0), and spend a
+**nullifier** so the same fact is used once. The server holds a testnet wallet that pays the fees.
+
+| Chain | On Cardano tab | The fact proven | Nullifier |
+|---|---|---|---|
+| document-review-chain | look up a released proposal, mint a **certified release NFT** | the release receipt (approval consumed by the release) | proposal id in the registry's on-chain MPF claimed set |
+| orders-chain | lock ADA in a **delivery escrow**, release it to the supplier | the finalized-message record of `{"event":"delivered","order":…}` (optionally from the carrier's member) | the escrow UTxO itself |
+| balances-chain | **snapshot rewards**: claim POINTS for a member's balance | `b/<member key> → amount` at the season's snapshot | account key in the season's claimed set |
+
+The **Anchor & mint** page (`#/cardano`) shows each chain's anchored height and the blocks to the next anchor, and
+holds the operator actions: open the certificate registry and a rewards season, give members points, and
+**Populate until anchored** (demo writes until the chain is due: the showcase anchors every 30 blocks or at most
+every 60 minutes). With a node admin key configured, **Anchor now** asks the members to anchor immediately.
+
+- **Validators** live in `onchain/` (Aiken v1.1.x). `aiken build` there, then copy `onchain/plutus.json` to
+  `src/main/resources/cardano/plutus.json`; both are checked in. `aiken check` runs 19 tests, including real
+  showcase bytes (an order message, a release receipt and a balance proven against their anchored roots).
+- **Parameters** (each chain's anchor identity, a one-shot seed UTxO per registry) are applied at runtime with
+  julc's UPLC codec (`julc-core`), so the server needs no Aiken toolchain. `ScriptParamsTest` checks the result
+  is the same program `aiken blueprint apply` produces.
+- **Cardano access** goes through a member's own Blockfrost-compatible API with cardano-client-lib's supplier
+  interfaces (`cardano/L1.java`): no Retrofit/OkHttp backend in the native image.
+- **State**: registry and season deployments, recorded claims and escrows in `demo.cardano.state-file`. Only the
+  claimed-set roots are on chain; the client checks its local set against them before every claim.
+- **Safety in a public demo**: at most `transactions-per-hour` Cardano transactions (all visitors together), a fixed
+  escrow amount, operator actions behind `operator-token-file`. The validators trust an anchored root because a
+  threshold of the chain's members co-signed it; they cannot tell whether those members recorded the truth.
 
 ## Chain configuration view
 

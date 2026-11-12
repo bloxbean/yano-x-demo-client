@@ -33,6 +33,9 @@ public interface DemoConfig {
 
     Http http();
 
+    /** Optional "On Cardano" features: validators that act on anchored app-ledger facts. Off unless enabled. */
+    Cardano cardano();
+
     /**
      * Directory with the cluster's public app-chain files (sealed {@code *.chain}, {@code *.draft.yaml}, bindings and
      * role plans), shown in each chain's Configuration tab. Any layout: an `appchain new/seal` folder, a showcase.sh
@@ -125,5 +128,51 @@ public interface DemoConfig {
 
         /** Optional X-API-Key for node reads that require it; read from a file, never logged. */
         Optional<String> apiKeyFile();
+    }
+
+    interface Cardano {
+        /** Turns the On Cardano panels and the Anchor & mint page on. Needs a funded wallet. */
+        @WithDefault("false")
+        boolean enabled();
+
+        /** File holding the demo wallet's recovery phrase (testnets only). Never logged, never sent to browsers. */
+        Optional<String> walletMnemonicFile();
+
+        /** Where registries, claimed sets and escrows are kept (the claimed-set roots are also on chain). */
+        @WithDefault("data/cardano-state.json")
+        String stateFile();
+
+        /**
+         * Operator actions (open registries and seasons, populate, force-anchor) need this token in the
+         * X-Demo-Operator header. Unset: operator actions are open, which is fine on a laptop, not on the internet.
+         */
+        Optional<String> operatorTokenFile();
+
+        /** Optional node admin API key (X-API-Key) for "Anchor now" through the node's admin force-anchor. */
+        Optional<String> adminApiKeyFile();
+
+        /** Cardano transactions the server will build and pay for, per hour (all visitors together). */
+        @WithDefault("40")
+        int transactionsPerHour();
+
+        /** ADA locked per delivery escrow. */
+        @WithDefault("10")
+        int escrowAda();
+
+        /** The anchor schedule the cluster was sealed with (blocks), for the "blocks to the next anchor" hint. */
+        @WithDefault("30")
+        int anchorEveryBlocks();
+
+        @WithDefault("document-review-chain")
+        String certificatesChain();
+
+        @WithDefault("document-release")
+        String releasePolicy();
+
+        @WithDefault("orders-chain")
+        String escrowChain();
+
+        @WithDefault("balances-chain")
+        String rewardsChain();
     }
 }

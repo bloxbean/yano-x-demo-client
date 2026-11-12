@@ -154,6 +154,70 @@ export const api = {
     }),
 }
 
+// ------------------------------------------------------------------ On Cardano
+
+export interface CardanoAnchor {
+  chainId: string; height: number; stateRoot: string; utxoTx: string; utxoIndex: number
+  scriptAddress: string; threadPolicy: string; threshold: number; members: number
+}
+export interface CardanoChain {
+  chainId: string; useCase: 'certificates' | 'escrow' | 'rewards'; tip: number; lastAnchored: number
+  blocksToAnchor: number; anchor?: CardanoAnchor; anchorError?: string
+}
+export interface CardanoOverview {
+  enabled: boolean; reason?: string; wallet?: string; walletLovelace?: number; operatorTokenRequired?: boolean
+  anchorNowAvailable?: boolean; anchorEveryBlocks?: number; transactionsPerHour?: number; chains?: CardanoChain[]
+  certificates?: { policy?: string; address?: string; openTx?: string }
+  rewards?: { policy?: string; address?: string; openTx?: string; snapshotHeight?: number; snapshotRoot?: string }
+}
+export interface CardanoJob { id: string; title: string; state: 'queued' | 'running' | 'done' | 'failed'; log: string[]; error?: string; result?: unknown }
+export interface ReleaseLookup {
+  proposal: string; released: boolean; appTip: number; anchoredHeight: number; entity?: string; policy?: string
+  releasedHeight?: number; anchored?: boolean; registryOpen: boolean; minted: boolean; mintTx?: string; policyId?: string
+}
+export interface CertificateMint { proposal: string; tx: string; anchoredHeight: number }
+export interface Escrow {
+  order: string; ada: number; carrier: string; createTx: string; refundAfter: number; open?: boolean
+  deliveryMessage?: string; deliveryHeight?: number; releaseTx?: string; refundTx?: string
+}
+export interface EscrowView { supplier: string; supplierLovelace: number; escrowAda: number; escrows: Escrow[] }
+export interface RewardAccount {
+  nodeId: string; label: string; memberKey: string; owner: string; snapshotBalance?: number; claimed?: boolean; claimTx?: string
+}
+
+const OPERATOR_KEY = 'yano-demo-operator-token'
+export const operatorToken = {
+  get: () => { try { return localStorage.getItem(OPERATOR_KEY) ?? '' } catch { return '' } },
+  set: (t: string) => { try { localStorage.setItem(OPERATOR_KEY, t) } catch { /* private mode */ } },
+}
+const post = <T,>(path: string, body: unknown, operator = false) => request<T>(`/cardano${path}`, {
+  method: 'POST', body: JSON.stringify(body ?? {}),
+  headers: operator ? { 'X-Demo-Operator': operatorToken.get() } : {},
+})
+
+export const cardano = {
+  overview: () => request<CardanoOverview>('/cardano/overview'),
+  jobs: () => request<CardanoJob[]>('/cardano/jobs'),
+  job: (id: string) => request<CardanoJob>(`/cardano/jobs/${id}`),
+  lookup: (proposal: string) => request<ReleaseLookup>(`/cardano/certificates/lookup?proposal=${encodeURIComponent(proposal)}`),
+  certificates: () => request<CertificateMint[]>('/cardano/certificates'),
+  mint: (proposal: string) => post<{ job: string }>('/certificates/mint', { proposal }),
+  openCertificates: () => post<{ job: string }>('/certificates/open', {}, true),
+  release: (proposal: string, entity: string, content: string) =>
+    post<{ job: string }>('/certificates/release', { proposal, entity, content }, true),
+  escrows: () => request<EscrowView>('/cardano/escrow'),
+  createEscrow: (order: string, carrier: string) => post<{ job: string }>('/escrow/create', { order, carrier }),
+  deliver: (order: string, node: string) => post<{ job: string }>('/escrow/deliver', { order, node }),
+  releaseEscrow: (createTx: string) => post<{ job: string }>('/escrow/release', { createTx }),
+  refundEscrow: (createTx: string) => post<{ job: string }>('/escrow/refund', { createTx }),
+  accounts: () => request<RewardAccount[]>('/cardano/rewards'),
+  claim: (memberKey: string) => post<{ job: string }>('/rewards/claim', { memberKey }),
+  openSeason: () => post<{ job: string }>('/rewards/open', {}, true),
+  points: (memberKey: string, amount: number) => post<{ job: string }>('/rewards/points', { memberKey, amount }, true),
+  populate: (chain: string) => post<{ job: string }>('/populate', { chain }, true),
+  anchorNow: (chain: string) => post<{ job: string }>('/anchor-now', { chain }, true),
+}
+
 export function explorerLink(template: string | undefined, tx: string | null | undefined): string | null {
   if (!template || !tx) return null
   return template.replace('{tx}', tx)

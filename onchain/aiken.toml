@@ -1,0 +1,23 @@
+name = "yano-x/anchor-proofs"
+version = "0.1.0"
+compiler = "v1.1.23"
+plutus = "v3"
+license = "MIT"
+description = "Cardano validators that act on Yano app-ledger facts proven against a script-anchored state root"
+
+[repository]
+user = "bloxbean"
+project = "yano-x-anchor-proofs"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "v2"
+source = "github"
+
+[[dependencies]]
+name = "aiken-lang/merkle-patricia-forestry"
+version = "v2.1.0"
+source = "github"
+
+[config]

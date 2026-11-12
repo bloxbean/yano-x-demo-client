@@ -1,15 +1,16 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Activity, Anchor, ArrowLeft, Dices, FileCog, FlaskConical, KeyRound, Lightbulb, Search, Send, ShieldCheck, UserRound } from 'lucide-react'
+import { Activity, Anchor, ArrowLeft, Coins, Dices, FileCog, FlaskConical, KeyRound, Lightbulb, Search, Send, ShieldCheck, UserRound } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import { api, quorumText, type ActorInfo, type ChainSpec, type Command, type Field, type LookupResult, type MemberInfo } from './api'
 import { useDemo } from './App'
 import { ConfigPanel } from './ConfigPanel'
+import { CARDANO_CHAINS, CardanoTab, useCardano } from './OnCardano'
 import { SubmissionList } from './Submissions'
 import { FactsGrid, ProofButton, VerifyPanel } from './Verify'
 import { Badge, Button, Card, LiveDot, Mono, Spinner, accent, go } from './ui'
 
-type Tab = 'try' | 'lookup' | 'activity' | 'verify' | 'config'
+type Tab = 'try' | 'lookup' | 'activity' | 'verify' | 'cardano' | 'config'
 
 /** Identifier fields carried from one command to the next within a chain (per page session). */
 const CARRIED = ['item', 'key', 'entity', 'order', 'proposal', 'release', 'content', 'reference', 'product', 'note']
@@ -22,6 +23,7 @@ export function Workspace({ chainId }: { chainId: string }) {
     enabled: !!readNode,
   })
   const [tab, setTab] = useState<Tab>('try')
+  const onCardano = useCardano()
   const [actingNode, setActingNode] = useState<string | undefined>()
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export function Workspace({ chainId }: { chainId: string }) {
     { id: 'lookup', label: 'Look up', icon: Search, hidden: spec.lookups.length === 0 },
     { id: 'activity', label: 'Activity', icon: Activity },
     { id: 'verify', label: 'Verify', icon: ShieldCheck },
+    { id: 'cardano', label: 'On Cardano', icon: Coins, hidden: !CARDANO_CHAINS[spec.id] || !onCardano.data?.enabled },
     { id: 'config', label: 'Config', icon: FileCog },
   ]
 
@@ -78,7 +81,7 @@ export function Workspace({ chainId }: { chainId: string }) {
           <div className="flex gap-1 rounded-2xl border border-line bg-surface p-1">
             {tabs.filter((t) => !t.hidden).map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={clsx('flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition',
+                className={clsx('flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition',
                   tab === t.id ? 'bg-raised text-ink shadow-inner' : 'text-muted hover:text-ink')}>
                 <t.icon size={15} className={tab === t.id ? 'text-accent' : ''} /> {t.label}
               </button>
@@ -88,6 +91,7 @@ export function Workspace({ chainId }: { chainId: string }) {
           {tab === 'lookup' && <Lookups spec={spec} />}
           {tab === 'activity' && <ActivityList chainId={spec.id} />}
           {tab === 'verify' && <VerifyPanel chainId={spec.id} live={live} />}
+          {tab === 'cardano' && <CardanoTab chainId={spec.id} />}
           {tab === 'config' && <ConfigPanel chainId={spec.id} />}
         </div>
         <SubmissionList chainId={spec.id} anchor={live.anchor} />
